@@ -32,7 +32,6 @@ const navItems = [
   { icon: BarChart3, label: 'Pipeline', href: '/dashboard/pipeline' },
   { icon: Zap, label: 'Automações', href: '/dashboard/automations' },
   { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics' },
-  { icon: Settings, label: 'Configurações', href: '/dashboard/settings' },
 ];
 
 export default function DashboardLayout({

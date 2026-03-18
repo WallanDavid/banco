@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { CheckCircle, ShieldCheck, TrendingUp, ArrowRight } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { supabase, isMockMode } from '@/lib/supabase';
 
 export default function LandingPage() {
   const [formData, setFormData] = useState({
@@ -20,8 +20,16 @@ export default function LandingPage() {
     e.preventDefault();
     setLoading(true);
 
+    if (isMockMode) {
+      console.log('Mock Mode: Simulating form submission', formData);
+      setTimeout(() => {
+        setSuccess(true);
+        setLoading(false);
+      }, 1000);
+      return;
+    }
+
     try {
-      // Get the 'Novo Lead' pipeline status ID
       const { data: pipelineData } = await supabase
         .from('pipelines')
         .select('id')
@@ -197,9 +205,11 @@ export default function LandingPage() {
                 {!loading && <ArrowRight className="w-5 h-5" />}
               </button>
               
-              <p className="text-xs text-center text-gray-500 mt-4">
-                Ao clicar em "Solicitar", você concorda com nossos termos de uso e política de privacidade.
-              </p>
+              {isMockMode && (
+                <p className="text-xs text-center text-amber-600 mt-2 font-bold uppercase tracking-widest">
+                  Demonstração: Rodando em modo de simulação
+                </p>
+              )}
             </form>
           </div>
         </section>

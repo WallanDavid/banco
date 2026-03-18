@@ -23,7 +23,7 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { supabase } from '@/lib/supabase';
+import { supabase, isMockMode } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -35,6 +35,14 @@ const chartData = [
   { name: 'Sex', leads: 189, conv: 480 },
   { name: 'Sáb', leads: 239, conv: 380 },
   { name: 'Dom', leads: 349, conv: 430 },
+];
+
+const MOCK_LEADS = [
+  { id: '1', name: 'João Silva', phone: '(11) 99999-1111', salary: 5000, score: 85, created_at: new Date().toISOString() },
+  { id: '2', name: 'Maria Santos', phone: '(21) 98888-2222', salary: 7500, score: 92, created_at: new Date().toISOString() },
+  { id: '3', name: 'Pedro Oliveira', phone: '(31) 97777-3333', salary: 3200, score: 65, created_at: new Date().toISOString() },
+  { id: '4', name: 'Ana Costa', phone: '(41) 96666-4444', salary: 4800, score: 78, created_at: new Date().toISOString() },
+  { id: '5', name: 'Carlos Souza', phone: '(51) 95555-5555', salary: 9000, score: 95, created_at: new Date().toISOString() },
 ];
 
 export default function Dashboard() {
@@ -49,6 +57,18 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function fetchData() {
+      if (isMockMode) {
+        setRecentLeads(MOCK_LEADS);
+        setStats({
+          totalLeads: 124,
+          conversionRate: 15.2,
+          revenue: 185400.00,
+          activeProposals: 12
+        });
+        setLoading(false);
+        return;
+      }
+
       try {
         const { data: leads, count: totalLeads } = await supabase
           .from('leads')
@@ -60,15 +80,11 @@ export default function Dashboard() {
           .from('proposals')
           .select('status');
 
-        const { data: contracts } = await supabase
-          .from('contracts')
-          .select('status');
-
         setRecentLeads(leads || []);
         setStats({
           totalLeads: totalLeads || 0,
-          conversionRate: 12.5, // Mock for now
-          revenue: 154200.00, // Mock for now
+          conversionRate: 12.5,
+          revenue: 154200.00,
           activeProposals: proposals?.filter(p => p.status === 'pending').length || 0
         });
       } catch (err) {
@@ -87,10 +103,19 @@ export default function Dashboard() {
     { label: 'Propostas Ativas', value: stats.activeProposals, icon: CheckCircle, trend: '-3%', color: 'amber' },
   ];
 
-  if (loading) return <div>Carregando...</div>;
+  if (loading) return <div className="p-12 text-center font-bold text-gray-400 animate-pulse">CARREGANDO DASHBOARD...</div>;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      {isMockMode && (
+        <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-center justify-between">
+          <p className="text-amber-800 text-sm font-bold flex items-center gap-2">
+            <span className="w-2 h-2 bg-amber-500 rounded-full animate-ping"></span>
+            MODO DE DEMONSTRAÇÃO: Exibindo dados simulados (Sem Supabase)
+          </p>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard de Vendas</h1>
@@ -234,7 +259,7 @@ export default function Dashboard() {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500">
-                    {format(new RegExp(lead.created_at), 'dd MMM, HH:mm', { locale: ptBR })}
+                    {format(new Date(lead.created_at), 'dd MMM, HH:mm', { locale: ptBR })}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-white transition-all">

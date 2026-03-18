@@ -9,6 +9,7 @@ import {
   Settings, 
   MessageSquare, 
   BarChart3, 
+  PieChart,
   FileText, 
   LogOut,
   Bell,
@@ -31,7 +32,7 @@ const navItems = [
   { icon: Users, label: 'Leads', href: '/dashboard/leads' },
   { icon: BarChart3, label: 'Pipeline', href: '/dashboard/pipeline' },
   { icon: Zap, label: 'Automações', href: '/dashboard/automations' },
-  { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics' },
+  { icon: PieChart, label: 'Analytics', href: '/dashboard/analytics' },
 ];
 
 export default function DashboardLayout({
@@ -96,6 +97,55 @@ export default function DashboardLayout({
       >
         {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
       </button>
+
+      {/* Mobile Sidebar Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="lg:hidden fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-40 animate-in fade-in duration-300"
+          onClick={() => setIsMobileMenuOpen(false)}
+        >
+          <aside 
+            className="w-64 bg-white h-full shadow-2xl animate-in slide-in-from-left duration-300 flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 flex items-center gap-3">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <TrendingUp className="text-white w-5 h-5" />
+              </div>
+              <span className="text-lg font-bold text-gray-900 tracking-tight">Banco Automático</span>
+            </div>
+
+            <nav className="flex-1 px-4 py-4 space-y-1">
+              {navItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all group",
+                    pathname === item.href 
+                      ? "bg-blue-50 text-blue-600 shadow-sm shadow-blue-50/50" 
+                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
+                  )}
+                >
+                  <item.icon className={cn(
+                    "w-5 h-5 transition-colors",
+                    pathname === item.href ? "text-blue-600" : "text-gray-400 group-hover:text-gray-900"
+                  )} />
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+
+            <div className="p-4 border-t border-gray-100">
+              <button className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all">
+                <LogOut className="w-5 h-5" />
+                Sair
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">

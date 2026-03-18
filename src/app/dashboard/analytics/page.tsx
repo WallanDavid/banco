@@ -59,13 +59,17 @@ const responseTimeData = [
 
 export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 800);
+    setMounted(true);
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 1000);
     return () => clearTimeout(timer);
   }, []);
 
-  if (loading) return (
+  if (!mounted || loading) return (
     <div className="min-h-[80vh] flex flex-col items-center justify-center gap-4">
       <div className="w-12 h-12 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
       <p className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Gerando Relatórios...</p>

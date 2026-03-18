@@ -10,7 +10,14 @@ import {
   ArrowDownRight,
   Calendar,
   MoreVertical,
-  ChevronRight
+  ChevronRight,
+  Filter,
+  Search,
+  ArrowRight,
+  Zap,
+  Clock,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -21,147 +28,146 @@ import {
   Tooltip, 
   ResponsiveContainer,
   AreaChart,
-  Area
+  Area,
+  PieChart,
+  Pie,
+  Cell
 } from 'recharts';
 import { supabase, isMockMode } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import Link from 'next/link';
 
 const chartData = [
-  { name: 'Seg', leads: 400, conv: 240 },
-  { name: 'Ter', leads: 300, conv: 139 },
-  { name: 'Qua', leads: 200, conv: 980 },
-  { name: 'Qui', leads: 278, conv: 390 },
-  { name: 'Sex', leads: 189, conv: 480 },
-  { name: 'Sáb', leads: 239, conv: 380 },
-  { name: 'Dom', leads: 349, conv: 430 },
+  { name: 'Seg', leads: 45, conv: 12 },
+  { name: 'Ter', leads: 52, conv: 15 },
+  { name: 'Qua', leads: 38, conv: 10 },
+  { name: 'Qui', leads: 65, conv: 22 },
+  { name: 'Sex', leads: 48, conv: 18 },
+  { name: 'Sáb', leads: 24, conv: 8 },
+  { name: 'Dom', leads: 15, conv: 4 },
 ];
 
 const MOCK_LEADS = [
-  { id: '1', name: 'João Silva', phone: '(11) 99999-1111', salary: 5000, score: 85, created_at: new Date().toISOString() },
-  { id: '2', name: 'Maria Santos', phone: '(21) 98888-2222', salary: 7500, score: 92, created_at: new Date().toISOString() },
-  { id: '3', name: 'Pedro Oliveira', phone: '(31) 97777-3333', salary: 3200, score: 65, created_at: new Date().toISOString() },
-  { id: '4', name: 'Ana Costa', phone: '(41) 96666-4444', salary: 4800, score: 78, created_at: new Date().toISOString() },
-  { id: '5', name: 'Carlos Souza', phone: '(51) 95555-5555', salary: 9000, score: 95, created_at: new Date().toISOString() },
+  { id: '1', name: 'João Silva', phone: '(11) 99999-1111', salary: 5200, score: 85, status: 'Novo Lead', source: 'Facebook Ads', created_at: new Date(Date.now() - 1000*60*30).toISOString() },
+  { id: '2', name: 'Maria Santos', phone: '(21) 98888-2222', salary: 7500, score: 92, status: 'Qualificado', source: 'Google Ads', created_at: new Date(Date.now() - 1000*60*120).toISOString() },
+  { id: '3', name: 'Pedro Oliveira', phone: '(31) 97777-3333', salary: 3200, score: 65, status: 'Contatado', source: 'Orgânico', created_at: new Date(Date.now() - 1000*60*240).toISOString() },
+  { id: '4', name: 'Ana Costa', phone: '(41) 96666-4444', salary: 4800, score: 78, status: 'Proposta Enviada', source: 'Indicação', created_at: new Date(Date.now() - 1000*60*400).toISOString() },
+  { id: '5', name: 'Carlos Souza', phone: '(51) 95555-5555', salary: 9000, score: 95, status: 'Fechado Ganho', source: 'Facebook Ads', created_at: new Date(Date.now() - 1000*60*600).toISOString() },
 ];
+
+const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'];
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
-    totalLeads: 0,
-    conversionRate: 0,
-    revenue: 0,
-    activeProposals: 0
+    totalLeads: 1245,
+    conversionRate: 18.4,
+    revenue: 452800.00,
+    avgResponseTime: '14 min',
+    activeProposals: 42
   });
-  const [recentLeads, setRecentLeads] = useState<any[]>([]);
+  
+  const [leads, setLeads] = useState(MOCK_LEADS);
+  const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchData() {
-      if (isMockMode) {
-        setRecentLeads(MOCK_LEADS);
-        setStats({
-          totalLeads: 124,
-          conversionRate: 15.2,
-          revenue: 185400.00,
-          activeProposals: 12
-        });
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const { data: leads, count: totalLeads } = await supabase
-          .from('leads')
-          .select('*', { count: 'exact' })
-          .order('created_at', { ascending: false })
-          .limit(5);
-
-        const { data: proposals } = await supabase
-          .from('proposals')
-          .select('status');
-
-        setRecentLeads(leads || []);
-        setStats({
-          totalLeads: totalLeads || 0,
-          conversionRate: 12.5,
-          revenue: 154200.00,
-          activeProposals: proposals?.filter(p => p.status === 'pending').length || 0
-        });
-      } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
+    setRole(localStorage.getItem('userRole'));
+    const timer = setTimeout(() => setLoading(false), 1000);
+    return () => clearTimeout(timer);
   }, []);
 
-  const statCards = [
-    { label: 'Total de Leads', value: stats.totalLeads, icon: Users, trend: '+12%', color: 'blue' },
-    { label: 'Taxa de Conversão', value: `${stats.conversionRate}%`, icon: TrendingUp, trend: '+2.4%', color: 'green' },
-    { label: 'Receita Prevista', value: `R$ ${stats.revenue.toLocaleString('pt-BR')}`, icon: DollarSign, trend: '+5.1%', color: 'indigo' },
-    { label: 'Propostas Ativas', value: stats.activeProposals, icon: CheckCircle, trend: '-3%', color: 'amber' },
-  ];
+  const isAdmin = role === 'admin';
 
-  if (loading) return <div className="p-12 text-center font-bold text-gray-400 animate-pulse">CARREGANDO DASHBOARD...</div>;
+  // If seller, show only their leads (simulated by filtering first 3)
+  const displayLeads = isAdmin ? leads : leads.slice(0, 3);
+
+  const filteredLeads = displayLeads.filter(lead => {
+    const matchesFilter = filter === 'all' || lead.status === filter;
+    const matchesSearch = lead.name.toLowerCase().includes(search.toLowerCase()) || lead.phone.includes(search);
+    return matchesFilter && matchesSearch;
+  });
+
+  if (loading) return (
+    <div className="min-h-[80vh] flex flex-col items-center justify-center gap-4">
+      <div className="w-12 h-12 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
+      <p className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Carregando Dashboard...</p>
+    </div>
+  );
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      {isMockMode && (
-        <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-center justify-between">
-          <p className="text-amber-800 text-sm font-bold flex items-center gap-2">
-            <span className="w-2 h-2 bg-amber-500 rounded-full animate-ping"></span>
-            MODO DE DEMONSTRAÇÃO: Exibindo dados simulados (Sem Supabase)
-          </p>
-        </div>
-      )}
-
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-10 animate-in fade-in duration-700">
+      {/* KPI Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard de Vendas</h1>
-          <p className="text-gray-500 text-sm mt-1">Bem-vindo de volta, Agente Master.</p>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Visão Geral</h1>
+          <p className="text-gray-500 font-medium mt-1">Bem-vindo à central de comando, <span className="text-blue-600 font-bold">Agente Master</span>.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all">
-            <Calendar className="w-4 h-4" />
-            Últimos 7 dias
+          <button 
+            onClick={() => {
+              setLoading(true);
+              setTimeout(() => {
+                setLeads([...MOCK_LEADS].sort(() => Math.random() - 0.5));
+                setLoading(false);
+              }, 1000);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-100 transition-all border border-amber-100"
+          >
+            Reiniciar Demo
           </button>
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-all shadow-sm shadow-blue-200">
-            Novo Relatório
+          <div className="bg-white p-1 rounded-2xl border border-gray-100 shadow-sm flex">
+            <button className="px-4 py-2 bg-gray-900 text-white rounded-xl text-xs font-bold transition-all">Hoje</button>
+            <button className="px-4 py-2 text-gray-400 hover:text-gray-900 rounded-xl text-xs font-bold transition-all">Semana</button>
+            <button className="px-4 py-2 text-gray-400 hover:text-gray-900 rounded-xl text-xs font-bold transition-all">Mês</button>
+          </div>
+          <button className="p-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200">
+            <Zap className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      {/* Stat Cards */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statCards.map((stat, i) => (
-          <div key={i} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group">
-            <div className="flex items-start justify-between">
-              <div className={`p-3 rounded-xl bg-${stat.color}-50 text-${stat.color}-600 group-hover:bg-${stat.color}-600 group-hover:text-white transition-all`}>
-                <stat.icon className="w-6 h-6" />
+        {[
+          { label: 'Total de Leads', value: stats.totalLeads, icon: Users, trend: '+12.5%', color: 'blue' },
+          { label: 'Taxa de Conversão', value: `${stats.conversionRate}%`, icon: TrendingUp, trend: '+2.1%', color: 'green' },
+          { label: 'Receita Prevista', value: `R$ ${(stats.revenue/1000).toFixed(1)}k`, icon: DollarSign, trend: '+5.4%', color: 'indigo' },
+          { label: 'Tempo Médio Resposta', value: stats.avgResponseTime, icon: Clock, trend: '-4 min', color: 'amber' },
+        ].map((kpi, i) => (
+          <div key={i} className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm hover:shadow-xl hover:translate-y-[-4px] transition-all group">
+            <div className="flex items-start justify-between mb-6">
+              <div className={`p-4 rounded-2xl bg-${kpi.color}-50 text-${kpi.color}-600 group-hover:bg-${kpi.color}-600 group-hover:text-white transition-all`}>
+                <kpi.icon className="w-6 h-6" />
               </div>
-              <span className={`text-xs font-bold px-2 py-1 rounded-full ${stat.trend.startsWith('+') ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
-                {stat.trend}
-              </span>
+              <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black ${kpi.trend.startsWith('+') ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600'}`}>
+                {kpi.trend.startsWith('+') ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                {kpi.trend}
+              </div>
             </div>
-            <div className="mt-4">
-              <h3 className="text-gray-500 text-sm font-medium">{stat.label}</h3>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
-            </div>
+            <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">{kpi.label}</h3>
+            <p className="text-3xl font-black text-gray-900">{kpi.value}</p>
           </div>
         ))}
       </div>
 
-      {/* Charts Section */}
+      {/* Main Analytics Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-bold text-gray-900">Performance de Leads</h3>
-            <select className="text-xs font-bold bg-gray-50 border-none rounded-lg px-3 py-1.5 focus:ring-0">
-              <option>Leads vs Conversões</option>
+        {/* Performance Chart */}
+        <div className="lg:col-span-2 bg-white p-8 rounded-[40px] border border-gray-100 shadow-sm">
+          <div className="flex items-center justify-between mb-10">
+            <div>
+              <h3 className="text-xl font-black text-gray-900">Fluxo de Leads</h3>
+              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Volume de entrada vs Conversão</p>
+            </div>
+            <select className="bg-gray-50 border-none rounded-xl px-4 py-2 text-xs font-black text-gray-500 focus:ring-0 cursor-pointer">
+              <option>Últimos 7 dias</option>
+              <option>Últimos 30 dias</option>
             </select>
           </div>
-          <div className="h-[300px]">
+          <div className="h-[350px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData}>
                 <defs>
@@ -171,105 +177,179 @@ export default function Dashboard() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#64748b'}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#64748b'}} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fontWeight: 'bold', fill: '#94a3b8'}} dy={15} />
+                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fontWeight: 'bold', fill: '#94a3b8'}} />
                 <Tooltip 
-                  contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
+                  contentStyle={{borderRadius: '24px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', padding: '16px'}}
+                  cursor={{stroke: '#3b82f6', strokeWidth: 2, strokeDasharray: '5 5'}}
                 />
-                <Area type="monotone" dataKey="leads" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorLeads)" />
+                <Area type="monotone" dataKey="leads" stroke="#3b82f6" strokeWidth={4} fillOpacity={1} fill="url(#colorLeads)" />
+                <Area type="monotone" dataKey="conv" stroke="#10b981" strokeWidth={4} fill="none" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-          <h3 className="font-bold text-gray-900 mb-6">Pipeline Atual</h3>
-          <div className="space-y-6">
+        {/* Lead Source Pie */}
+        <div className="bg-white p-8 rounded-[40px] border border-gray-100 shadow-sm">
+          <h3 className="text-xl font-black text-gray-900 mb-2">Origem dos Leads</h3>
+          <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-10">ROI por canal</p>
+          <div className="h-[280px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={[
+                    { name: 'Facebook', value: 45 },
+                    { name: 'Google', value: 30 },
+                    { name: 'Orgânico', value: 15 },
+                    { name: 'Indicação', value: 10 },
+                  ]}
+                  innerRadius={70}
+                  outerRadius={100}
+                  paddingAngle={8}
+                  dataKey="value"
+                >
+                  {MOCK_LEADS.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="space-y-3 mt-6">
             {[
-              { label: 'Novo Lead', count: 45, color: 'blue' },
-              { label: 'Qualificado', count: 28, color: 'indigo' },
-              { label: 'Proposta', count: 12, color: 'amber' },
-              { label: 'Fechado', count: 8, color: 'green' },
+              { label: 'Facebook Ads', val: '45%', color: 'bg-blue-500' },
+              { label: 'Google Ads', val: '30%', color: 'bg-indigo-500' },
+              { label: 'Outros', val: '25%', color: 'bg-green-500' },
             ].map((item, i) => (
-              <div key={i} className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium text-gray-700">{item.label}</span>
-                  <span className="font-bold text-gray-900">{item.count}</span>
+              <div key={i} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${item.color}`}></div>
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{item.label}</span>
                 </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full bg-${item.color}-500 rounded-full`}
-                    style={{ width: `${(item.count / 45) * 100}%` }}
-                  />
-                </div>
+                <span className="text-xs font-black text-gray-900">{item.val}</span>
               </div>
             ))}
           </div>
-          <button className="w-full mt-8 py-3 text-sm font-bold text-blue-600 hover:bg-blue-50 rounded-xl transition-all flex items-center justify-center gap-2">
-            Ver Pipeline Completo
-            <ChevronRight className="w-4 h-4" />
-          </button>
         </div>
       </div>
 
-      {/* Recent Leads Table */}
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-gray-50 flex items-center justify-between">
-          <h3 className="font-bold text-gray-900">Leads Recentes</h3>
-          <button className="text-sm font-bold text-blue-600 hover:underline">Ver todos</button>
+      {/* CRM Section */}
+      <div className="bg-white rounded-[40px] border border-gray-100 shadow-sm overflow-hidden">
+        <div className="p-8 border-b border-gray-50 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <h3 className="text-xl font-black text-gray-900">Gestão de Leads</h3>
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Filtre e gerencie sua carteira</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input 
+                type="text" 
+                placeholder="Buscar por nome ou fone..." 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-12 pr-6 py-3 bg-gray-50 border-none rounded-2xl text-xs font-bold focus:ring-2 focus:ring-blue-500 w-full md:w-64 outline-none"
+              />
+            </div>
+            <div className="flex bg-gray-50 p-1 rounded-2xl">
+              <button 
+                onClick={() => setFilter('all')}
+                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filter === 'all' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'}`}
+              >
+                Todos
+              </button>
+              <button 
+                onClick={() => setFilter('Novo Lead')}
+                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filter === 'Novo Lead' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'}`}
+              >
+                Novos
+              </button>
+            </div>
+          </div>
         </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-            <thead className="bg-gray-50/50">
-              <tr>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Lead</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Salário</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Score</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Data</th>
-                <th className="px-6 py-4"></th>
+            <thead>
+              <tr className="bg-gray-50/50">
+                <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Lead / Contato</th>
+                <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Financeiro</th>
+                <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Status</th>
+                <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Score</th>
+                <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Origem</th>
+                <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {recentLeads.map((lead) => (
-                <tr key={lead.id} className="hover:bg-gray-50/80 transition-all cursor-pointer group">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
+              {filteredLeads.map((lead) => (
+                <tr key={lead.id} className="hover:bg-gray-50/80 transition-all group cursor-pointer">
+                  <td className="px-8 py-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 font-black text-sm group-hover:bg-blue-600 group-hover:text-white transition-all">
                         {lead.name.charAt(0)}
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-gray-900">{lead.name}</p>
-                        <p className="text-xs text-gray-500">{lead.phone}</p>
+                        <p className="text-sm font-black text-gray-900">{lead.name}</p>
+                        <p className="text-xs font-bold text-gray-400">{lead.phone}</p>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm font-medium text-gray-700">
-                    R$ {lead.salary?.toLocaleString('pt-BR')}
+                  <td className="px-8 py-6">
+                    <p className="text-sm font-black text-gray-900">R$ {lead.salary.toLocaleString('pt-BR')}</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Renda Mensal</p>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-100">
-                      Novo Lead
+                  <td className="px-8 py-6">
+                    <span className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                      lead.status === 'Novo Lead' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                      lead.status === 'Fechado Ganho' ? 'bg-green-50 text-green-600 border-green-100' :
+                      'bg-gray-50 text-gray-500 border-gray-100'
+                    }`}>
+                      {lead.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-                      <span className="text-sm font-bold text-gray-900">{lead.score}</span>
+                  <td className="px-8 py-6">
+                    <div className="flex items-center gap-2">
+                      <div className="w-full max-w-[60px] h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-green-500 rounded-full" style={{ width: `${lead.score}%` }}></div>
+                      </div>
+                      <span className="text-xs font-black text-gray-900">{lead.score}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
-                    {format(new Date(lead.created_at), 'dd MMM, HH:mm', { locale: ptBR })}
+                  <td className="px-8 py-6">
+                    <span className="text-xs font-bold text-gray-500">{lead.source}</span>
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-white transition-all">
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
+                  <td className="px-8 py-6">
+                    <Link 
+                      href={`/dashboard/leads/${lead.id}`}
+                      className="p-3 hover:bg-white rounded-xl transition-all flex items-center justify-center group/btn"
+                    >
+                      <ArrowRight className="w-5 h-5 text-gray-300 group-hover/btn:text-blue-600 group-hover/btn:translate-x-1 transition-all" />
+                    </Link>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+        
+        {filteredLeads.length === 0 && (
+          <div className="p-20 text-center">
+            <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Search className="w-10 h-10 text-gray-200" />
+            </div>
+            <h4 className="text-lg font-black text-gray-900">Nenhum lead encontrado</h4>
+            <p className="text-sm text-gray-400 font-medium">Tente ajustar seus filtros ou busca.</p>
+          </div>
+        )}
+
+        <div className="p-8 border-t border-gray-50 flex items-center justify-between bg-gray-50/30">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Mostrando {filteredLeads.length} de {leads.length} leads totais</p>
+          <div className="flex gap-2">
+            <button className="px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-black text-gray-400 uppercase hover:text-gray-900 transition-all shadow-sm">Anterior</button>
+            <button className="px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-black text-gray-400 uppercase hover:text-gray-900 transition-all shadow-sm">Próximo</button>
+          </div>
         </div>
       </div>
     </div>

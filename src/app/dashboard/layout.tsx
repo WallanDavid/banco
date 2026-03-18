@@ -42,6 +42,13 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    setRole(localStorage.getItem('userRole'));
+  }, []);
+
+  const isAdmin = role === 'admin';
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -113,11 +120,11 @@ export default function DashboardLayout({
             </button>
             <div className="flex items-center gap-3 pl-4 border-l border-gray-200">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold text-gray-900">Agente Master</p>
-                <p className="text-xs text-gray-500">Administrador</p>
+                <p className="text-sm font-bold text-gray-900">{isAdmin ? 'Agente Master' : 'Vendedor'}</p>
+                <p className="text-xs text-gray-500 uppercase font-black tracking-widest">{isAdmin ? 'Administrador' : 'Equipe Comercial'}</p>
               </div>
-              <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
-                AM
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold shadow-sm ${isAdmin ? 'bg-blue-100 text-blue-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                {isAdmin ? 'AM' : 'VE'}
               </div>
             </div>
           </div>

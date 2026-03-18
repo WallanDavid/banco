@@ -18,7 +18,8 @@ import {
   DollarSign,
   User,
   Zap,
-  Bot
+  Bot,
+  Copy
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
@@ -121,6 +122,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [proposalLink, setProposalLink] = useState('');
 
   const handleGenerateProposal = async () => {
+    if (!lead) return;
     setGenerating(true);
     try {
       // Simulate API call to /api/proposals/generate

@@ -95,124 +95,145 @@ export default function LandingPage() {
       </nav>
 
       <main>
-        {/* Hero Section */}
-        <section className="py-12 px-6 md:px-12 max-w-7xl mx-auto grid md:grid-cols-2 gap-12 items-center">
-          <div>
-            <h1 className="text-4xl md:text-6xl font-extrabold text-gray-900 leading-tight mb-6">
-              Crédito Consignado <br />
-              <span className="text-blue-600">Simples e Rápido</span>
-            </h1>
-            <p className="text-lg text-gray-600 mb-8 max-w-lg">
-              Receba sua simulação em minutos e receba o dinheiro na conta com as menores taxas do mercado. 100% digital e seguro.
-            </p>
-            
-            <div className="space-y-4 mb-8">
-              <div className="flex items-center gap-3">
-                <ShieldCheck className="w-6 h-6 text-green-500" />
-                <span className="text-gray-700 font-medium">Processo 100% seguro e auditado</span>
+          {/* Hero Section */}
+          <section className="py-20 px-6 md:px-12 max-w-7xl mx-auto grid lg:grid-cols-5 gap-16 items-center">
+            <div className="lg:col-span-3">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-full text-xs font-bold uppercase tracking-widest mb-6">
+                <span className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></span>
+                Taxas a partir de 1.45% ao mês
               </div>
-              <div className="flex items-center gap-3">
-                <CheckCircle className="w-6 h-6 text-green-500" />
-                <span className="text-gray-700 font-medium">Aprovação rápida e sem burocracia</span>
+              <h1 className="text-5xl md:text-7xl font-black text-gray-900 leading-tight mb-8">
+                Dinheiro na mão <br />
+                <span className="text-blue-600">sem burocracia</span>
+              </h1>
+              <p className="text-xl text-gray-600 mb-10 max-w-xl leading-relaxed">
+                Crédito consignado para aposentados, pensionistas e servidores públicos. Receba em até 24 horas com as melhores condições do Brasil.
+              </p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-12">
+                <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100 hover:border-blue-100 transition-all group">
+                  <div className="p-3 bg-white rounded-xl text-green-500 shadow-sm group-hover:bg-green-500 group-hover:text-white transition-all">
+                    <ShieldCheck className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-gray-900">100% Seguro</h4>
+                    <p className="text-xs text-gray-500 mt-1">Processo auditado e aprovado pelo Banco Central.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100 hover:border-blue-100 transition-all group">
+                  <div className="p-3 bg-white rounded-xl text-blue-500 shadow-sm group-hover:bg-blue-500 group-hover:text-white transition-all">
+                    <CheckCircle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-gray-900">Aprovação Rápida</h4>
+                    <p className="text-xs text-gray-500 mt-1">Análise automática de margem em poucos minutos.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-6 opacity-60 grayscale hover:grayscale-0 transition-all">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center font-black text-gray-400 text-xs italic">
+                    BACEN
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-tighter text-gray-400">Regulado</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center font-black text-gray-400 text-xs italic">
+                    FEBRABAN
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-tighter text-gray-400">Certificado</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Lead Form */}
-          <div className="bg-gray-50 p-8 rounded-3xl border border-gray-200 shadow-sm">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Simule agora seu crédito</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
-                  <input
-                    type="text"
-                    name="name"
-                    required
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                    placeholder="João Silva"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp</label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    required
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                    placeholder="(11) 99999-9999"
-                  />
-                </div>
-              </div>
+            {/* Lead Form */}
+            <div className="lg:col-span-2 relative">
+              <div className="absolute -top-12 -right-12 w-64 h-64 bg-blue-100 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
+              <div className="absolute -bottom-12 -left-12 w-64 h-64 bg-indigo-100 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
-                <input
-                  type="email"
-                  name="email"
-                  required
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                  placeholder="joao@email.com"
-                />
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Salário Mensal (R$)</label>
-                  <input
-                    type="number"
-                    name="salary"
-                    required
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                    placeholder="5000"
-                  />
+              <div className="relative bg-white p-10 rounded-[40px] border border-gray-100 shadow-2xl shadow-blue-100/50">
+                <div className="text-center mb-8">
+                  <h2 className="text-3xl font-black text-gray-900">Simule Agora</h2>
+                  <p className="text-gray-500 text-sm mt-2 font-medium">Preencha e receba sua proposta via WhatsApp</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Idade</label>
-                  <input
-                    type="number"
-                    name="age"
-                    required
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                    placeholder="45"
-                  />
-                </div>
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Valor do Empréstimo (R$)</label>
-                <input
-                  type="number"
-                  name="loan_amount"
-                  required
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                  placeholder="10000"
-                />
-              </div>
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Dados Pessoais</label>
+                    <input
+                      type="text"
+                      name="name"
+                      required
+                      onChange={handleChange}
+                      className="w-full px-5 py-4 rounded-2xl bg-gray-50 border border-gray-100 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-medium text-sm"
+                      placeholder="Seu nome completo"
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <input
+                        type="tel"
+                        name="phone"
+                        required
+                        onChange={handleChange}
+                        className="w-full px-5 py-4 rounded-2xl bg-gray-50 border border-gray-100 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-medium text-sm"
+                        placeholder="WhatsApp"
+                      />
+                      <input
+                        type="number"
+                        name="age"
+                        required
+                        onChange={handleChange}
+                        className="w-full px-5 py-4 rounded-2xl bg-gray-50 border border-gray-100 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-medium text-sm"
+                        placeholder="Sua idade"
+                      />
+                    </div>
+                  </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-200"
-              >
-                {loading ? 'Processando...' : 'Solicitar Simulação Grátis'}
-                {!loading && <ArrowRight className="w-5 h-5" />}
-              </button>
-              
-              {isMockMode && (
-                <p className="text-xs text-center text-amber-600 mt-2 font-bold uppercase tracking-widest">
-                  Demonstração: Rodando em modo de simulação
-                </p>
-              )}
-            </form>
-          </div>
-        </section>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Informações Financeiras</label>
+                    <input
+                      type="number"
+                      name="salary"
+                      required
+                      onChange={handleChange}
+                      className="w-full px-5 py-4 rounded-2xl bg-gray-50 border border-gray-100 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-medium text-sm"
+                      placeholder="Salário líquido (R$)"
+                    />
+                    <input
+                      type="number"
+                      name="loan_amount"
+                      required
+                      onChange={handleChange}
+                      className="w-full px-5 py-4 rounded-2xl bg-gray-50 border border-gray-100 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all font-medium text-sm border-l-4 border-l-blue-600"
+                      placeholder="Quanto você precisa? (R$)"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-3 shadow-xl shadow-blue-200 group"
+                  >
+                    {loading ? (
+                      <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        Ver Minha Margem
+                        <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+                      </>
+                    )}
+                  </button>
+                  
+                  {isMockMode && (
+                    <div className="flex items-center justify-center gap-2 text-[10px] text-amber-600 font-black uppercase tracking-widest animate-pulse">
+                      <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
+                      Ambiente de Testes Ativo
+                    </div>
+                  )}
+                </form>
+              </div>
+            </div>
+          </section>
       </main>
 
       <footer className="py-12 border-t border-gray-100 text-center text-gray-500 text-sm">

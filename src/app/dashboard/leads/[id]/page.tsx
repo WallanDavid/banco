@@ -117,8 +117,44 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     }
   };
 
-  if (loading) return <div>Carregando...</div>;
-  if (!lead) return <div>Lead não encontrado.</div>;
+  const [generating, setGenerating] = useState(false);
+  const [proposalLink, setProposalLink] = useState('');
+
+  const handleGenerateProposal = async () => {
+    setGenerating(true);
+    try {
+      // Simulate API call to /api/proposals/generate
+      setTimeout(() => {
+        const mockProposalId = 'prop_' + Math.random().toString(36).substr(2, 9);
+        const link = `${window.location.origin}/contract/${mockProposalId}`;
+        setProposalLink(link);
+        
+        // Add a message about the proposal
+        const newMsg = {
+          id: Date.now().toString(),
+          lead_id: lead.id,
+          sender: 'bot',
+          content: `📄 Sua proposta de R$ ${lead.loan_amount?.toLocaleString('pt-BR')} foi gerada! Acesse para assinar: ${link}`,
+          type: 'whatsapp',
+          status: 'sent',
+          created_at: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, newMsg]);
+        setGenerating(false);
+      }, 1500);
+    } catch (err) {
+      console.error('Error generating proposal:', err);
+      setGenerating(false);
+    }
+  };
+
+  const copyProposalLink = () => {
+    navigator.clipboard.writeText(proposalLink);
+    alert('Link da proposta copiado!');
+  };
+
+  if (loading) return <div className="p-12 text-center font-bold text-gray-400 animate-pulse uppercase tracking-widest">CARREGANDO DETALHES DO LEAD...</div>;
+  if (!lead) return <div className="p-12 text-center font-bold text-red-500">Lead não encontrado.</div>;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -209,15 +245,35 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
           {/* Action Buttons */}
           <div className="grid grid-cols-2 gap-3">
-            <button className="flex flex-col items-center justify-center p-4 bg-white border border-gray-100 rounded-2xl shadow-sm hover:bg-blue-50 hover:border-blue-100 transition-all group">
-              <FileText className="w-5 h-5 text-gray-400 group-hover:text-blue-600 mb-2" />
-              <span className="text-xs font-bold text-gray-700">Nova Proposta</span>
+            <button 
+              onClick={handleGenerateProposal}
+              disabled={generating}
+              className="flex flex-col items-center justify-center p-4 bg-white border border-gray-100 rounded-2xl shadow-sm hover:bg-blue-50 hover:border-blue-100 transition-all group disabled:opacity-50"
+            >
+              {generating ? (
+                <div className="w-5 h-5 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin mb-2" />
+              ) : (
+                <FileText className="w-5 h-5 text-gray-400 group-hover:text-blue-600 mb-2" />
+              )}
+              <span className="text-xs font-bold text-gray-700">{generating ? 'Gerando...' : 'Gerar Proposta'}</span>
             </button>
             <button className="flex flex-col items-center justify-center p-4 bg-white border border-gray-100 rounded-2xl shadow-sm hover:bg-indigo-50 hover:border-indigo-100 transition-all group">
               <Zap className="w-5 h-5 text-gray-400 group-hover:text-indigo-600 mb-2" />
               <span className="text-xs font-bold text-gray-700">Automações</span>
             </button>
           </div>
+
+          {proposalLink && (
+            <div className="p-4 bg-green-50 border border-green-100 rounded-2xl animate-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-bold text-green-700 uppercase tracking-widest">Link de Autocontratação</span>
+                <button onClick={copyProposalLink} className="p-1.5 hover:bg-green-100 rounded-lg transition-all">
+                  <Copy className="w-3.5 h-3.5 text-green-600" />
+                </button>
+              </div>
+              <p className="text-[10px] font-mono text-green-800 break-all">{proposalLink}</p>
+            </div>
+          )}
         </div>
 
         {/* Chat / Timeline Area */}

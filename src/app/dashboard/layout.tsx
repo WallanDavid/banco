@@ -30,9 +30,8 @@ const navItems = [
   { icon: LayoutDashboard, label: 'Resumo', href: '/dashboard' },
   { icon: Users, label: 'Leads', href: '/dashboard/leads' },
   { icon: BarChart3, label: 'Pipeline', href: '/dashboard/pipeline' },
-  { icon: MessageSquare, label: 'Mensagens', href: '/dashboard/messages' },
-  { icon: FileText, label: 'Propostas', href: '/dashboard/proposals' },
   { icon: Zap, label: 'Automações', href: '/dashboard/automations' },
+  { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics' },
   { icon: Settings, label: 'Configurações', href: '/dashboard/settings' },
 ];
 

@@ -32,6 +32,8 @@ export default function LoginPage() {
       } else {
         localStorage.setItem('userRole', 'vendedor');
       }
+      localStorage.setItem('userEmail', email);
+      localStorage.setItem('userName', email.split('@')[0] || 'Usuário');
       router.push('/dashboard');
     }, 1500);
   };

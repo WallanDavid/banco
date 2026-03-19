@@ -309,3 +309,85 @@ export function upsertDemoLeadFromLanding(input: {
   setDemoState(next);
   return lead;
 }
+
+type StoreLead = DemoLead & {
+  sellerEmail?: string;
+};
+
+export type StoreProposal = {
+  id: string;
+  leadId: string;
+  partner: FintechPartner;
+  nominalRateMonthly: number;
+  installments: number;
+  createdAt: string;
+  contractUrl: string;
+  status: string;
+};
+
+async function callStore<T>(options: { entity: string; method: string; id?: string; leadId?: string; sellerEmail?: string; body?: unknown }) {
+  const qs = new URLSearchParams();
+  qs.set('entity', options.entity);
+  if (options.id) qs.set('id', options.id);
+  if (options.leadId) qs.set('leadId', options.leadId);
+  if (options.sellerEmail) qs.set('sellerEmail', options.sellerEmail);
+
+  const res = await fetch(`/.netlify/functions/store?${qs.toString()}`, {
+    method: options.method,
+    headers: options.body ? { 'content-type': 'application/json' } : undefined,
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+
+  const data = (await res.json()) as T;
+  if (!res.ok) throw new Error('store request failed');
+  return data;
+}
+
+export async function storeReset() {
+  return callStore<{ ok: boolean; seed: number }>({ entity: 'reset', method: 'POST' });
+}
+
+export async function storeGetLeads(params?: { sellerEmail?: string }) {
+  const data = await callStore<{ ok: boolean; leads: StoreLead[] }>({ entity: 'leads', method: 'GET', sellerEmail: params?.sellerEmail });
+  return data.leads;
+}
+
+export async function storeGetLead(id: string) {
+  return callStore<{ ok: boolean; lead: StoreLead; proposal: StoreProposal | null }>({ entity: 'leads', method: 'GET', id });
+}
+
+export async function storeCreateLead(input: {
+  name: string;
+  phone: string;
+  salary: number;
+  age: number;
+  loanAmount: number;
+  profile: LeadProfile;
+  source?: string;
+  sellerEmail?: string;
+  fintechInterest?: FintechPartner;
+  stage?: LeadStage;
+}) {
+  const data = await callStore<{ ok: boolean; lead: StoreLead }>({ entity: 'leads', method: 'POST', body: input });
+  return data.lead;
+}
+
+export async function storeUpdateLead(id: string, patch: { stage?: LeadStage; appointmentAt?: string; interaction?: Omit<DemoInteraction, 'id'> }) {
+  const data = await callStore<{ ok: boolean; lead: StoreLead }>({ entity: 'leads', method: 'PATCH', id, body: patch });
+  return data.lead;
+}
+
+export async function storeCreateProposal(leadId: string) {
+  return callStore<{ ok: boolean; proposal: StoreProposal; lead: StoreLead }>({ entity: 'proposals', method: 'POST', body: { leadId } });
+}
+
+export async function storeGetProposalByLeadId(leadId: string) {
+  return callStore<{ ok: boolean; proposal: StoreProposal | null }>({ entity: 'proposals', method: 'GET', leadId });
+}
+
+export async function storeGetState() {
+  return callStore<{ ok: boolean; state: { sellers: DemoSeller[]; leads: StoreLead[]; proposals: StoreProposal[]; automations: unknown } }>({
+    entity: 'state',
+    method: 'GET',
+  });
+}

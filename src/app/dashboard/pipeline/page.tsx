@@ -10,7 +10,7 @@ import {
   TrendingUp,
   AlertCircle
 } from 'lucide-react';
-import { ensureDemoState, moveDemoLeadStage, type DemoLead, type LeadStage } from '@/lib/supabase';
+import { storeGetLeads, storeUpdateLead, type DemoLead, type LeadStage } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Link from 'next/link';
@@ -50,20 +50,41 @@ export default function PipelinePage() {
   const [leads, setLeads] = useState<DemoLead[]>([]);
   const [loading, setLoading] = useState(true);
   const [draggingLeadId, setDraggingLeadId] = useState<string | null>(null);
+  const [role, setRole] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
     setTimeout(() => {
-      const demo = ensureDemoState();
-      setLeads(demo.leads);
+      setRole(localStorage.getItem('userRole'));
+      setUserEmail(localStorage.getItem('userEmail'));
     }, 0);
     const timer = setTimeout(() => setLoading(false), 800);
     return () => clearTimeout(timer);
   }, []);
 
-  const handleDrop = (stage: LeadStage, leadId: string) => {
-    moveDemoLeadStage(leadId, stage);
-    const demo = ensureDemoState();
-    setLeads(demo.leads);
+  useEffect(() => {
+    async function load() {
+      try {
+        const sellerEmail = role === 'admin' ? undefined : userEmail ?? undefined;
+        const all = await storeGetLeads({ sellerEmail });
+        setLeads(all);
+      } catch {
+        setLeads([]);
+      }
+    }
+    if (!role) return;
+    load();
+  }, [role, userEmail]);
+
+  const handleDrop = async (stage: LeadStage, leadId: string) => {
+    try {
+      await storeUpdateLead(leadId, { stage });
+      const sellerEmail = role === 'admin' ? undefined : userEmail ?? undefined;
+      const all = await storeGetLeads({ sellerEmail });
+      setLeads(all);
+    } catch {
+      setLeads((prev) => prev);
+    }
   };
 
   if (loading) return (

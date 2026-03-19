@@ -23,7 +23,7 @@ import {
   Target,
   MousePointer2
 } from 'lucide-react';
-import { ensureDemoState, type DemoState } from '@/lib/supabase';
+import { storeGetState, type DemoLead, type DemoSeller } from '@/lib/supabase';
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#64748b'];
 
@@ -54,17 +54,15 @@ const responseTimeData = [
 export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
-  const [demo, setDemo] = useState<DemoState | null>(null);
+  const [storeState, setStoreState] = useState<{ sellers: DemoSeller[]; leads: DemoLead[] } | null>(null);
 
   useEffect(() => {
     const raf = requestAnimationFrame(() => setMounted(true));
     const timer = setTimeout(() => setLoading(false), 1000);
     const storageTimer = setTimeout(() => {
-      try {
-        setDemo(ensureDemoState());
-      } catch {
-        setDemo(null);
-      }
+      storeGetState()
+        .then((res) => setStoreState({ sellers: res.state.sellers, leads: res.state.leads as DemoLead[] }))
+        .catch(() => setStoreState(null));
     }, 0);
     return () => {
       cancelAnimationFrame(raf);
@@ -73,8 +71,8 @@ export default function AnalyticsPage() {
     };
   }, []);
 
-  const demoLeads = useMemo(() => demo?.leads ?? [], [demo]);
-  const demoSellers = useMemo(() => demo?.sellers ?? [], [demo]);
+  const demoLeads = useMemo(() => storeState?.leads ?? [], [storeState]);
+  const demoSellers = useMemo(() => storeState?.sellers ?? [], [storeState]);
 
   const profileData = useMemo(() => {
     const counts = demoLeads.reduce(

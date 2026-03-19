@@ -15,7 +15,7 @@ import {
   Clock,
   Check
 } from 'lucide-react';
-import { ensureDemoState, isMockMode, type DemoLead } from '@/lib/supabase';
+import { isMockMode, storeGetLead, storeGetProposalByLeadId, storeUpdateLead, type DemoLead } from '@/lib/supabase';
 import { simulateCredit, type SimulationResult } from '@/lib/credit-logic';
 
 type FintechProposal = {
@@ -60,56 +60,48 @@ export default function ContractPage({ params }: { params: Promise<{ id: string 
   useEffect(() => {
     async function load() {
       if (isMockMode) {
-        const demo = ensureDemoState();
-        const demoLead = demo.leads.find((l) => l.id === resolvedParams.id);
-        const effectiveLead: DemoLead | null = demoLead ?? null;
-
-        const mappedLead: ContractLead = effectiveLead
-          ? {
-              name: effectiveLead.name,
-              loan_amount: effectiveLead.loanAmount,
-              salary: effectiveLead.salary,
-              age: effectiveLead.age,
-              benefit_type:
-                effectiveLead.profile === 'clt'
-                  ? 'CLT / Empregado Privado'
-                  : effectiveLead.profile === 'servidor_publico'
-                    ? 'Servidor Público'
-                    : 'Aposentado / Pensionista',
-              profile: effectiveLead.profile,
-            }
-          : { name: 'João Silva', loan_amount: 12000, salary: 5200, age: 45, benefit_type: 'Aposentado / Pensionista', profile: 'aposentado_pensionista' };
-
-        setLead(mappedLead);
-        setPartner(effectiveLead?.fintechInterest ?? 'V8');
-
-        const sim = simulateCredit({ salary: mappedLead.salary, age: mappedLead.age, loan_amount: mappedLead.loan_amount });
-
         try {
-          const qp = new URLSearchParams({
-            leadId: resolvedParams.id,
-            amount: String(mappedLead.loan_amount),
-            profile: mappedLead.profile,
-            partner: (effectiveLead?.fintechInterest ?? 'V8') === 'V8' ? 'V8' : 'PRESENCA',
-          });
-          const res = await fetch(`/.netlify/functions/fintech-proposal?${qp.toString()}`, { cache: 'no-store' });
-          if (!res.ok) throw new Error('fintech proposal failed');
-          const data = await res.json();
-          setPartner(data.partner === 'V8' ? 'V8' : 'PRESENCA');
-          setProposal({ simulation_data: sim, status: 'pending', fintech: data });
-        } catch {
+          const { lead: storeLead, proposal: maybeProposal } = await storeGetLead(resolvedParams.id);
+          const mappedLead: ContractLead = {
+            name: storeLead.name,
+            loan_amount: storeLead.loanAmount,
+            salary: storeLead.salary,
+            age: storeLead.age,
+            benefit_type:
+              storeLead.profile === 'clt'
+                ? 'CLT / Empregado Privado'
+                : storeLead.profile === 'servidor_publico'
+                  ? 'Servidor Público'
+                  : 'Aposentado / Pensionista',
+            profile: storeLead.profile,
+          };
+
+          const storedProposal = maybeProposal ?? (await storeGetProposalByLeadId(storeLead.id)).proposal;
+          const sim = simulateCredit({ salary: mappedLead.salary, age: mappedLead.age, loan_amount: mappedLead.loan_amount });
+
+          setLead(mappedLead);
+          const p = storedProposal?.partner === 'PRESENCA' ? 'PRESENCA' : 'V8';
+          setPartner(p);
+
           setProposal({
             simulation_data: sim,
             status: 'pending',
-            fintech: {
-              partner: (effectiveLead?.fintechInterest ?? 'V8') === 'V8' ? 'V8' : 'PRESENCA',
-              status: 'pre_approved',
-            },
+            fintech: storedProposal
+              ? {
+                  partner: p,
+                  nominalRateMonthly: storedProposal.nominalRateMonthly,
+                  installments: storedProposal.installments,
+                  status: storedProposal.status,
+                }
+              : { partner: p, status: 'pre_approved' },
           });
-        } finally {
+
           setLoading(false);
+          return;
+        } catch {
+          setLoading(false);
+          return;
         }
-        return;
       }
 
       setLead({ name: 'João Silva', loan_amount: 12000, salary: 5200, age: 45, benefit_type: 'Aposentado / Pensionista', profile: 'aposentado_pensionista' });
@@ -128,7 +120,14 @@ export default function ContractPage({ params }: { params: Promise<{ id: string 
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const nextStep = () => setStep(prev => prev + 1);
+  const nextStep = async () => {
+    if (step === 3) {
+      try {
+        await storeUpdateLead(resolvedParams.id, { stage: 'Contratado' });
+      } catch {}
+    }
+    setStep((prev) => prev + 1);
+  };
 
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-gray-50">

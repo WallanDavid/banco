@@ -8,7 +8,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import Link from 'next/link';
-import { ensureDemoState, type DemoLead } from '@/lib/supabase';
+import { storeGetLeads, type DemoLead } from '@/lib/supabase';
 
 function stageLabel(stage: DemoLead['stage']) {
   switch (stage) {
@@ -49,15 +49,31 @@ export default function LeadsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
+  const [role, setRole] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
     setTimeout(() => {
-      const demo = ensureDemoState();
-      setLeads(demo.leads);
+      setRole(localStorage.getItem('userRole'));
+      setUserEmail(localStorage.getItem('userEmail'));
     }, 0);
     const timer = setTimeout(() => setLoading(false), 800);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const sellerEmail = role === 'admin' ? undefined : userEmail ?? undefined;
+        const all = await storeGetLeads({ sellerEmail });
+        setLeads(all);
+      } catch {
+        setLeads([]);
+      }
+    }
+    if (!role) return;
+    load();
+  }, [role, userEmail]);
 
   const filteredLeads = leads.filter(lead => {
     const matchesFilter = filter === 'all' || stageLabel(lead.stage) === filter;

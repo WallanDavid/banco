@@ -24,7 +24,7 @@ import {
   History,
   AlertCircle
 } from 'lucide-react';
-import { supabase, ensureDemoState, isMockMode, updateDemoLead, type DemoLead } from '@/lib/supabase';
+import { supabase, isMockMode, storeCreateProposal, storeGetLead, storeUpdateLead, type DemoLead, type StoreProposal } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Link from 'next/link';
@@ -83,6 +83,7 @@ function fintechLabel(fintech?: DemoLead['fintechInterest']) {
 export default function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = useReact(params);
   const [lead, setLead] = useState<Lead | null>(null);
+  const [proposal, setProposal] = useState<StoreProposal | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [notes, setNotes] = useState<string>('');
   const [newMessage, setNewMessage] = useState('');
@@ -90,61 +91,47 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [sending, setSending] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [proposalLink, setProposalLink] = useState('');
+  const [copiedProposal, setCopiedProposal] = useState(false);
   const [activeTab, setActiveTab] = useState<'chat' | 'historico'>('chat');
   const [appointmentAt, setAppointmentAt] = useState<string>('');
 
   useEffect(() => {
     async function fetchData() {
       if (isMockMode) {
-        const demo = ensureDemoState();
-        const demoLead = demo.leads.find((l) => l.id === resolvedParams.id);
-
-        const fallback = {
-          id: resolvedParams.id,
-          name: 'João Silva',
-          email: 'joao.silva@email.com',
-          phone: '(11) 99999-1111',
-          salary: 5200,
-          age: 45,
-          loan_amount: 12000,
-          score: 85,
-          status_id: '1',
-          source: 'Facebook Ads',
-          benefit_type: 'Aposentado / Pensionista',
-          created_at: new Date(Date.now() - 1000*60*60*24).toISOString(),
-        };
-
-        if (!demoLead) {
-          setLead(fallback);
+        try {
+          const data = await storeGetLead(resolvedParams.id);
+          const demoLead = data.lead as DemoLead;
+          const mapped: Lead = {
+            id: demoLead.id,
+            name: demoLead.name,
+            email: `${demoLead.name.toLowerCase().replace(/\s+/g, '.')}@email.com`,
+            phone: demoLead.phone,
+            salary: demoLead.salary,
+            age: demoLead.age,
+            loan_amount: demoLead.loanAmount,
+            score: demoLead.score,
+            status_id: demoLead.stage,
+            source: demoLead.source,
+            benefit_type: profileLabel(demoLead.profile),
+            created_at: demoLead.createdAt,
+            profile: demoLead.profile,
+            fintech_interest: demoLead.fintechInterest,
+            appointment_at: demoLead.appointmentAt,
+            interactions: demoLead.interactions,
+          };
+          setLead(mapped);
+          setProposal(data.proposal);
+          setProposalLink(data.proposal ? `${window.location.origin}${data.proposal.contractUrl}` : '');
           setMessages(MOCK_MESSAGES);
+          setAppointmentAt(demoLead.appointmentAt ? demoLead.appointmentAt.slice(0, 16) : '');
+          setLoading(false);
+          return;
+        } catch {
+          setLead(null);
+          setMessages([]);
           setLoading(false);
           return;
         }
-
-        const mapped: Lead = {
-          id: demoLead.id,
-          name: demoLead.name,
-          email: `${demoLead.name.toLowerCase().replace(/\s+/g, '.')}@email.com`,
-          phone: demoLead.phone,
-          salary: demoLead.salary,
-          age: demoLead.age,
-          loan_amount: demoLead.loanAmount,
-          score: demoLead.score,
-          status_id: demoLead.stage,
-          source: demoLead.source,
-          benefit_type: profileLabel(demoLead.profile),
-          created_at: demoLead.createdAt,
-          profile: demoLead.profile,
-          fintech_interest: demoLead.fintechInterest,
-          appointment_at: demoLead.appointmentAt,
-          interactions: demoLead.interactions,
-        };
-
-        setLead(mapped);
-        setMessages(MOCK_MESSAGES);
-        setAppointmentAt(demoLead.appointmentAt ? demoLead.appointmentAt.slice(0, 16) : '');
-        setLoading(false);
-        return;
       }
 
       try {
@@ -195,20 +182,21 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const handleGenerateProposal = () => {
     if (!lead) return;
     setGenerating(true);
-    setTimeout(() => {
-      const link = `${window.location.origin}/contract/${lead.id}`;
-      setProposalLink(link);
-      setGenerating(false);
-      
-      const botMsg: Message = {
-        id: Date.now().toString(),
-        sender: 'bot',
-        content: `📄 Proposta gerada! Valor: R$ ${lead.loan_amount.toLocaleString('pt-BR')}. Link para assinatura: ${link}`,
-        type: 'whatsapp',
-        created_at: new Date().toISOString()
-      };
-      setMessages(prev => [...prev, botMsg]);
-    }, 1500);
+    storeCreateProposal(lead.id)
+      .then(({ proposal: created }) => {
+        setProposal(created);
+        const link = `${window.location.origin}${created.contractUrl}`;
+        setProposalLink(link);
+        const botMsg: Message = {
+          id: Date.now().toString(),
+          sender: 'bot',
+          content: `📄 Proposta gerada! Valor: R$ ${lead.loan_amount.toLocaleString('pt-BR')}. Link para assinatura: ${link}`,
+          type: 'whatsapp',
+          created_at: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, botMsg]);
+      })
+      .finally(() => setGenerating(false));
   };
 
   if (loading) return (
@@ -332,7 +320,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   const iso = new Date(appointmentAt).toISOString();
                   setLead((prev) => (prev ? { ...prev, appointment_at: iso } : prev));
                   if (isMockMode) {
-                    updateDemoLead(lead.id, { appointmentAt: iso, stage: 'Agendamento' });
+                    storeUpdateLead(lead.id, { appointmentAt: iso });
                   }
                 }}
                 className="w-full py-3 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all"
@@ -410,6 +398,33 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 </button>
               </div>
             </div>
+
+            {proposalLink && (
+              <div className="px-6 py-4 border-b border-gray-50 bg-white">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex-1">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Link de Contratação</p>
+                    <input
+                      readOnly
+                      value={proposalLink}
+                      className="w-full px-4 py-3 bg-gray-50 border border-transparent rounded-2xl text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(proposalLink);
+                      setCopiedProposal(true);
+                      setTimeout(() => setCopiedProposal(false), 1200);
+                    }}
+                    className="px-5 py-3 bg-gray-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2"
+                  >
+                    <Copy className="w-4 h-4" />
+                    {copiedProposal ? 'Copiado' : 'Copiar'}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Message History */}
             <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-white custom-scrollbar">

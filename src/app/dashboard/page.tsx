@@ -33,7 +33,7 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { ensureDemoState, isMockMode, resetDemoState, type DemoLead, type LeadProfile } from '@/lib/supabase';
+import { storeGetLeads, storeReset, type DemoLead, type LeadProfile } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Link from 'next/link';
@@ -110,13 +110,15 @@ export default function Dashboard() {
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [role, setRole] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setTimeout(() => {
-      setRole(localStorage.getItem('userRole'));
-      const demo = ensureDemoState();
-      setLeads(demo.leads.map(mapDemoLeadToRow));
+      const storedRole = localStorage.getItem('userRole');
+      const storedEmail = localStorage.getItem('userEmail');
+      setRole(storedRole);
+      setUserEmail(storedEmail);
     }, 0);
     const timer = setTimeout(() => setLoading(false), 1000);
     return () => clearTimeout(timer);
@@ -124,10 +126,21 @@ export default function Dashboard() {
 
   const isAdmin = role === 'admin';
 
-  // If seller, show only their leads (simulated by filtering first 3)
-  const displayLeads = isAdmin ? leads : leads.slice(0, 3);
+  useEffect(() => {
+    async function load() {
+      try {
+        const sellerEmail = !isAdmin && userEmail ? userEmail : undefined;
+        const all = await storeGetLeads({ sellerEmail });
+        setLeads(all.map(mapDemoLeadToRow));
+      } catch {
+        setLeads([]);
+      }
+    }
+    if (!role) return;
+    load();
+  }, [isAdmin, role, userEmail]);
 
-  const filteredLeads = displayLeads.filter(lead => {
+  const filteredLeads = leads.filter(lead => {
     const matchesFilter = filter === 'all' || lead.status === filter;
     const matchesSearch = lead.name.toLowerCase().includes(search.toLowerCase()) || lead.phone.includes(search);
     return matchesFilter && matchesSearch;
@@ -153,9 +166,10 @@ export default function Dashboard() {
             onClick={() => {
               setLoading(true);
               setTimeout(() => {
-                const next = resetDemoState({ seed: Date.now() });
-                setLeads(next.leads.map(mapDemoLeadToRow));
-                setLoading(false);
+                storeReset()
+                  .then(() => storeGetLeads({ sellerEmail: !isAdmin && userEmail ? userEmail : undefined }))
+                  .then((all) => setLeads(all.map(mapDemoLeadToRow)))
+                  .finally(() => setLoading(false));
               }, 1000);
             }}
             className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-100 transition-all border border-amber-100"

@@ -13,10 +13,12 @@ import {
   Briefcase 
 } from 'lucide-react';
 import Link from 'next/link';
-import { supabase, isMockMode, upsertDemoLeadFromLanding, type LeadProfile } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
+import { supabase, isMockMode, storeCreateLead, type LeadProfile } from '@/lib/supabase';
 import { simulateCredit, type SimulationResult } from '@/lib/credit-logic';
 
 export default function LandingPage() {
+  const router = useRouter();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -29,10 +31,6 @@ export default function LandingPage() {
   
   const [simulation, setSimulation] = useState<SimulationResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [createdLeadId, setCreatedLeadId] = useState<string>('');
-  const [createdProfile, setCreatedProfile] = useState<LeadProfile>('aposentado_pensionista');
-  const [createdFintech, setCreatedFintech] = useState<'V8' | 'PRESENCA' | ''>('');
 
   // Update simulation when relevant fields change
   useEffect(() => {
@@ -49,22 +47,23 @@ export default function LandingPage() {
     setLoading(true);
 
     if (isMockMode) {
-      setTimeout(() => {
-        const created = upsertDemoLeadFromLanding({
-          name: formData.name,
-          phone: formData.phone,
-          salary: formData.salary,
-          age: formData.age,
-          loanAmount: formData.loan_amount,
-          profile: formData.vinculo,
-          source: 'Landing',
-        });
-        setCreatedLeadId(created.id);
-        setCreatedProfile(created.profile);
-        setCreatedFintech(created.fintechInterest);
-        setSuccess(true);
-        setLoading(false);
-      }, 1500);
+      setTimeout(async () => {
+        try {
+          const created = await storeCreateLead({
+            name: formData.name,
+            phone: formData.phone,
+            salary: formData.salary,
+            age: formData.age,
+            loanAmount: formData.loan_amount,
+            profile: formData.vinculo,
+            source: 'Landing',
+            stage: 'Captacao',
+          });
+          router.push(`/thanks?leadId=${encodeURIComponent(created.id)}`);
+        } finally {
+          setLoading(false);
+        }
+      }, 500);
       return;
     }
 
@@ -86,7 +85,7 @@ export default function LandingPage() {
       ]);
 
       if (error) throw error;
-      setSuccess(true);
+      router.push('/thanks');
     } catch (err) {
       console.error('Error submitting lead:', err);
       alert('Ocorreu um erro ao enviar seus dados. Tente novamente.');
@@ -101,80 +100,6 @@ export default function LandingPage() {
       : e.target.value;
     setFormData({ ...formData, [e.target.name]: value });
   };
-
-  if (success) {
-    const whatsappText = encodeURIComponent(
-      `Olá! Fiz uma simulação no Banco Automático. Meu vínculo é ${createdProfile === 'clt' ? 'CLT' : createdProfile === 'servidor_publico' ? 'Servidor Público' : 'Aposentado/Pensionista'}. Quero seguir com a proposta.`
-    );
-    const whatsappHref = `https://wa.me/55${formData.phone.replace(/\D/g, '')}?text=${whatsappText}`;
-
-    return (
-      <div className="min-h-screen bg-blue-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-[40px] p-12 max-w-xl w-full text-center shadow-2xl animate-in zoom-in-95 duration-500">
-          <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-8">
-            <CheckCircle className="w-12 h-12 text-green-500" />
-          </div>
-          <h2 className="text-4xl font-black text-gray-900 mb-4">Quase lá, {formData.name.split(' ')[0]}!</h2>
-          {createdProfile === 'clt' ? (
-            <p className="text-lg text-gray-600 mb-10 leading-relaxed">
-              Sua simulação de <span className="font-bold text-blue-600">R$ {formData.loan_amount.toLocaleString('pt-BR')}</span> foi processada com sucesso.
-              <span className="block mt-2">
-                Você já pode seguir com a <span className="font-black text-gray-900">autocontratação</span>.
-              </span>
-            </p>
-          ) : createdProfile === 'servidor_publico' ? (
-            <p className="text-lg text-gray-600 mb-10 leading-relaxed">
-              <span className="font-black text-green-600">Pré-aprovado!</span> Um consultor te chamará no WhatsApp em até 24h.
-            </p>
-          ) : (
-            <p className="text-lg text-gray-600 mb-10 leading-relaxed">
-              Sua simulação de <span className="font-bold text-blue-600">R$ {formData.loan_amount.toLocaleString('pt-BR')}</span> foi processada com sucesso. Enviamos os detalhes agora mesmo para o seu WhatsApp!
-            </p>
-          )}
-          <div className="bg-blue-50 p-6 rounded-3xl mb-10 flex items-center gap-4 text-left border border-blue-100">
-            <div className="p-3 bg-blue-600 rounded-xl text-white">
-              <Clock className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-blue-900 uppercase tracking-widest">Próximo Passo</p>
-              <p className="text-xs text-blue-700">
-                {createdProfile === 'clt'
-                  ? `Finalize sua contratação com o parceiro ${createdFintech === 'V8' ? 'V8 Fintech' : 'Presença Bank'}.`
-                  : 'Fique atento às notificações do seu celular.'}
-              </p>
-            </div>
-          </div>
-
-          {createdProfile === 'clt' && createdLeadId ? (
-            <Link
-              href={`/contract/${createdLeadId}`}
-              className="w-full inline-flex items-center justify-center gap-3 py-5 bg-gray-900 text-white rounded-2xl font-black text-lg hover:bg-black transition-all shadow-xl shadow-gray-200 group"
-            >
-              Contratar Agora
-              <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
-            </Link>
-          ) : (
-            <a
-              href={whatsappHref}
-              target="_blank"
-              rel="noreferrer"
-              className="w-full inline-flex items-center justify-center gap-3 py-5 bg-gray-900 text-white rounded-2xl font-black text-lg hover:bg-black transition-all shadow-xl shadow-gray-200 group"
-            >
-              Falar no WhatsApp
-              <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
-            </a>
-          )}
-
-          <button
-            onClick={() => setSuccess(false)}
-            className="text-gray-400 font-bold hover:text-gray-600 transition-colors"
-          >
-            Voltar para a página inicial
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-white font-sans selection:bg-blue-100 selection:text-blue-900">
@@ -435,9 +360,9 @@ export default function LandingPage() {
           <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">
             &copy; 2024 Gilda Tech - Todos os direitos reservados.
           </p>
-          <div className="flex gap-8">
-            <a href="#" className="text-xs font-bold text-gray-400 hover:text-blue-600 uppercase tracking-widest">Termos</a>
-            <a href="#" className="text-xs font-bold text-gray-400 hover:text-blue-600 uppercase tracking-widest">Privacidade</a>
+          <div className="flex flex-col md:flex-row items-center gap-4 md:gap-8">
+            <a href="mailto:contato@gildatech.com.br" className="text-xs font-bold text-gray-400 hover:text-blue-600 uppercase tracking-widest">contato@gildatech.com.br</a>
+            <a href="tel:+5511999999999" className="text-xs font-bold text-gray-400 hover:text-blue-600 uppercase tracking-widest">(11) 99999-9999</a>
           </div>
         </div>
       </footer>

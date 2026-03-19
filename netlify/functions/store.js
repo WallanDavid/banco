@@ -113,6 +113,40 @@ function listAutomations(automations) {
   return Object.keys(automations).map((k) => automations[k]);
 }
 
+function ensureSeller(store, email) {
+  if (!email) return null;
+  const existing = store.sellers.find((s) => s.email === email);
+  if (existing) return existing;
+  const baseName = String(email).split('@')[0] || 'Vendedor';
+  const seller = {
+    id: `seller_${baseName.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_${Date.now().toString(16)}`,
+    name: baseName.charAt(0).toUpperCase() + baseName.slice(1),
+    email,
+  };
+  store.sellers.push(seller);
+  return seller;
+}
+
+function ensureVendorHasLeads(store, sellerEmail) {
+  if (!sellerEmail) return;
+  const hasAny = store.leads.some((l) => l.sellerEmail === sellerEmail);
+  if (hasAny) return;
+
+  ensureSeller(store, sellerEmail);
+
+  const seed = Array.from(String(sellerEmail)).reduce((acc, ch) => acc + ch.charCodeAt(0), 0) + (store.seed || 0);
+  const rand = safeRandom(seed);
+  const candidates = store.leads.filter((l) => l.sellerEmail && l.sellerEmail.endsWith('@demo.com'));
+  const takeCount = Math.min(5, candidates.length);
+  for (let i = 0; i < takeCount; i++) {
+    const idx = Math.floor(rand() * candidates.length);
+    const chosen = candidates.splice(idx, 1)[0];
+    if (!chosen) continue;
+    chosen.sellerEmail = sellerEmail;
+    chosen.sellerId = `seller_${sellerEmail}`;
+  }
+}
+
 function generateLeads(seed, sellers, count) {
   const rand = safeRandom(seed);
   const profiles = ['clt', 'servidor_publico', 'aposentado_pensionista'];
@@ -236,6 +270,10 @@ exports.handler = async (event) => {
         const proposal = store.proposals.find((p) => p.leadId === id) || null;
         return json(200, { ok: true, lead, proposal });
       }
+      if (sellerEmail) {
+        ensureVendorHasLeads(store, sellerEmail);
+        writeStore(store);
+      }
       const leads = sellerEmail ? store.leads.filter((l) => l.sellerEmail === sellerEmail) : store.leads;
       return json(200, { ok: true, leads });
     }
@@ -249,7 +287,7 @@ exports.handler = async (event) => {
       }
       const rand = safeRandom(store.seed + store.leads.length + 17);
       const seller = payload.sellerEmail
-        ? store.sellers.find((s) => s.email === payload.sellerEmail) || pickOne(rand, store.sellers)
+        ? ensureSeller(store, payload.sellerEmail) || pickOne(rand, store.sellers)
         : pickOne(rand, store.sellers);
       const profile = payload.profile || 'aposentado_pensionista';
       const stage = payload.stage || 'Captacao';

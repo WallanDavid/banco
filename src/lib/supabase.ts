@@ -391,3 +391,25 @@ export async function storeGetState() {
     method: 'GET',
   });
 }
+
+export type StoreAutomation = {
+  id: string;
+  name: string;
+  active: boolean;
+  sent: number;
+};
+
+export async function storeGetAutomations() {
+  const data = await callStore<{ ok: boolean; automations: StoreAutomation[] }>({ entity: 'automations', method: 'GET' });
+  return data.automations;
+}
+
+export async function storeUpdateAutomation(id: string, patch?: { active?: boolean }) {
+  const data = await callStore<{ ok: boolean; automations: StoreAutomation[] }>({
+    entity: 'automations',
+    method: 'PATCH',
+    id,
+    body: patch ?? {},
+  });
+  return data.automations;
+}

@@ -54,6 +54,9 @@ function ensureStore() {
     proposals: [],
     automations: {
       welcomeEmail: { id: 'welcomeEmail', name: 'E-mail Boas-vindas (D+0)', active: true, sent: 0 },
+      stageStuckContatoInicial: { id: 'stageStuckContatoInicial', name: 'Lead parado em Contato Inicial (D+2)', active: true, sent: 0 },
+      cltNoContract: { id: 'cltNoContract', name: 'CLT simulou e não contratou (D+1)', active: true, sent: 0 },
+      appointmentReminder: { id: 'appointmentReminder', name: 'Servidor com agendamento (1h antes)', active: false, sent: 0 },
     },
   };
   base.leads = generateLeads(seed, base.sellers, 18);
@@ -91,17 +94,23 @@ function defaultInteractions(rand, lead) {
     createdAt: lead.createdAt,
   });
 
+  return interactions;
+}
+
+function scheduleWelcomeEmail(rand) {
   const welcomeAt = new Date(Date.now() + 60 * 1000).toISOString();
-  interactions.push({
+  return {
     id: makeId('evt', rand),
     type: 'email',
-    title: 'E-mail de boas-vindas (agendado)',
+    title: 'E-mail de boas-vindas (agendado +1min)',
     body: `Envio agendado para ${welcomeAt}.`,
     createdAt: welcomeAt,
     status: 'scheduled',
-  });
+  };
+}
 
-  return interactions;
+function listAutomations(automations) {
+  return Object.keys(automations).map((k) => automations[k]);
 }
 
 function generateLeads(seed, sellers, count) {
@@ -184,13 +193,39 @@ exports.handler = async (event) => {
     store.seed = seed;
     store.leads = generateLeads(seed, store.sellers, 18);
     store.proposals = [];
-    store.automations.welcomeEmail.sent = 0;
+    for (const k of Object.keys(store.automations)) {
+      store.automations[k].sent = 0;
+    }
     writeStore(store);
     return json(200, { ok: true, seed });
   }
 
   if (event.httpMethod === 'GET' && entity === 'state') {
     return json(200, { ok: true, state: store });
+  }
+
+  if (entity === 'automations') {
+    if (event.httpMethod === 'GET') {
+      return json(200, { ok: true, automations: listAutomations(store.automations) });
+    }
+
+    if (event.httpMethod === 'PATCH') {
+      if (!id) return json(400, { error: 'Missing automation id' });
+      if (!store.automations[id]) return json(404, { error: 'Automation not found' });
+      let patch = {};
+      try {
+        patch = event.body ? JSON.parse(event.body) : {};
+      } catch {
+        patch = {};
+      }
+      if (typeof patch.active === 'boolean') {
+        store.automations[id].active = patch.active;
+      } else {
+        store.automations[id].active = !store.automations[id].active;
+      }
+      writeStore(store);
+      return json(200, { ok: true, automations: listAutomations(store.automations) });
+    }
   }
 
   if (entity === 'leads') {
@@ -243,6 +278,10 @@ exports.handler = async (event) => {
         interactions: [],
       };
       lead.interactions = defaultInteractions(rand, lead);
+      if (store.automations.welcomeEmail?.active) {
+        lead.interactions.push(scheduleWelcomeEmail(rand));
+        store.automations.welcomeEmail.sent += 1;
+      }
       store.leads.unshift(lead);
       writeStore(store);
       return json(200, { ok: true, lead });

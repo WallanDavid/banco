@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Zap, 
   Mail, 
@@ -18,48 +18,41 @@ import {
   ChevronRight,
   Bot
 } from 'lucide-react';
-
-const INITIAL_AUTOMATIONS = [
-  {
-    id: '1',
-    name: 'Lead parado em Contato Inicial (D+2)',
-    trigger: 'stage_stuck',
-    action: 'send_whatsapp',
-    status: 'active',
-    description: 'Se o lead ficar 2 dias em Contato Inicial, envia lembrete automático (mock).',
-    stats: { sent: 312, conversion: '14%' }
-  },
-  {
-    id: '2',
-    name: 'CLT simulou e não contratou (D+1)',
-    trigger: 'simulation_no_contract',
-    delay: '24h',
-    action: 'send_whatsapp',
-    status: 'active',
-    description: 'Oferta especial para CLT após 24h sem contratação (mock).',
-    stats: { sent: 198, conversion: '9.2%' }
-  },
-  {
-    id: '3',
-    name: 'Servidor com agendamento (1h antes)',
-    trigger: 'appointment_reminder',
-    delay: '1h',
-    action: 'send_whatsapp',
-    status: 'paused',
-    description: 'Lembrete de retorno para servidor 1h antes do horário agendado (mock).',
-    stats: { sent: 74, conversion: '—' }
-  }
-];
+import { storeGetAutomations, storeUpdateAutomation, type StoreAutomation } from '@/lib/supabase';
 
 export default function AutomationsPage() {
-  const [automations, setAutomations] = useState(INITIAL_AUTOMATIONS);
+  const [automations, setAutomations] = useState<StoreAutomation[]>([]);
   const [isAdding, setIsAdding] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const toggleStatus = (id: string) => {
-    setAutomations(prev => prev.map(a => 
-      a.id === id ? { ...a, status: a.status === 'active' ? 'paused' : 'active' } : a
-    ));
+  useEffect(() => {
+    let isMounted = true;
+    storeGetAutomations()
+      .then((data) => {
+        if (!isMounted) return;
+        setAutomations(data);
+      })
+      .finally(() => {
+        if (!isMounted) return;
+        setLoading(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const toggleStatus = async (id: string) => {
+    setAutomations((prev) => prev.map((a) => (a.id === id ? { ...a, active: !a.active } : a)));
+    try {
+      const updated = await storeUpdateAutomation(id);
+      setAutomations(updated);
+    } catch {
+      const refreshed = await storeGetAutomations();
+      setAutomations(refreshed);
+    }
   };
+
+  const totalSent = automations.reduce((acc, a) => acc + (a.sent ?? 0), 0);
 
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
@@ -81,9 +74,9 @@ export default function AutomationsPage() {
       {/* Stats Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {[
-          { label: 'Ações Executadas', value: '4,515', icon: Zap, color: 'blue' },
-          { label: 'Taxa de Engajamento', value: '24.8%', icon: MessageSquare, color: 'indigo' },
-          { label: 'Tempo Economizado', value: '142h', icon: Clock, color: 'amber' },
+          { label: 'Ações Executadas', value: totalSent.toLocaleString('pt-BR'), icon: Zap, color: 'blue' },
+          { label: 'Automations Ativas', value: `${automations.filter(a => a.active).length}`, icon: MessageSquare, color: 'indigo' },
+          { label: 'Régua Boas-vindas', value: automations.find(a => a.id === 'welcomeEmail')?.active ? 'Ativa' : 'Pausada', icon: Clock, color: 'amber' },
         ].map((item, i) => (
           <div key={i} className="bg-white p-8 rounded-[40px] border border-gray-100 shadow-sm flex items-center gap-6">
             <div className={`p-4 rounded-2xl bg-${item.color}-50 text-${item.color}-600`}>
@@ -109,60 +102,62 @@ export default function AutomationsPage() {
         </div>
 
         <div className="divide-y divide-gray-50">
-          {automations.map((auto) => (
+          {loading && (
+            <div className="p-10 text-center text-xs font-black text-gray-400 uppercase tracking-widest">
+              Carregando automações...
+            </div>
+          )}
+
+          {!loading && automations.map((auto) => (
             <div key={auto.id} className="p-10 flex flex-col lg:flex-row lg:items-center justify-between gap-10 hover:bg-gray-50/50 transition-all group">
               <div className="flex items-start gap-6 max-w-lg">
                 <div className={`p-5 rounded-[24px] shadow-lg transition-transform group-hover:scale-110 ${
-                  auto.action === 'send_whatsapp' ? 'bg-green-500 text-white' :
-                  auto.action === 'send_email' ? 'bg-blue-500 text-white' :
-                  'bg-indigo-500 text-white'
+                  auto.id === 'welcomeEmail' ? 'bg-blue-500 text-white' :
+                  auto.id === 'appointmentReminder' ? 'bg-amber-500 text-white' :
+                  'bg-green-500 text-white'
                 }`}>
-                  {auto.action === 'send_whatsapp' ? <MessageSquare className="w-7 h-7" /> :
-                   auto.action === 'send_email' ? <Mail className="w-7 h-7" /> :
-                   <Smartphone className="w-7 h-7" />}
+                  {auto.id === 'welcomeEmail' ? <Mail className="w-7 h-7" /> :
+                   auto.id === 'appointmentReminder' ? <Clock className="w-7 h-7" /> :
+                   <MessageSquare className="w-7 h-7" />}
                 </div>
                 <div>
                   <div className="flex items-center gap-3 mb-2">
                     <h4 className="text-lg font-black text-gray-900 tracking-tight">{auto.name}</h4>
                     <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border ${
-                      auto.status === 'active' ? 'bg-green-50 text-green-600 border-green-100' : 'bg-gray-50 text-gray-400 border-gray-100'
+                      auto.active ? 'bg-green-50 text-green-600 border-green-100' : 'bg-gray-50 text-gray-400 border-gray-100'
                     }`}>
-                      {auto.status === 'active' ? 'Ativo' : 'Pausado'}
+                      {auto.active ? 'Ativo' : 'Pausado'}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-500 font-medium leading-relaxed">{auto.description}</p>
-                  <div className="flex items-center gap-4 mt-4">
-                    <div className="flex items-center gap-1.5 text-[10px] font-black text-gray-400 uppercase tracking-widest bg-gray-100 px-2 py-1 rounded-lg">
-                      <Target className="w-3 h-3" />
-                      Gatilho: {auto.trigger}
-                    </div>
-                    {auto.delay && (
-                      <div className="flex items-center gap-1.5 text-[10px] font-black text-gray-400 uppercase tracking-widest bg-amber-50 text-amber-600 px-2 py-1 rounded-lg">
-                        <Clock className="w-3 h-3" />
-                        Delay: {auto.delay}
-                      </div>
-                    )}
-                  </div>
+                  <p className="text-sm text-gray-500 font-medium leading-relaxed">
+                    {auto.id === 'welcomeEmail'
+                      ? 'Ao criar lead, agenda e registra e-mail de boas-vindas em +1 minuto.'
+                      : auto.id === 'stageStuckContatoInicial'
+                        ? 'Se o lead ficar parado em Contato Inicial, dispara lembrete (mock).'
+                        : auto.id === 'cltNoContract'
+                          ? 'Se CLT simular e não contratar, dispara oferta após 24h (mock).'
+                          : 'Lembrete de agendamento para servidor (mock).'}
+                  </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-12">
                 <div className="text-center">
-                  <p className="text-xl font-black text-gray-900">{auto.stats.sent}</p>
+                  <p className="text-xl font-black text-gray-900">{auto.sent.toLocaleString('pt-BR')}</p>
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Disparos</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xl font-black text-green-600">{auto.stats.conversion}</p>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Conversão</p>
+                  <p className="text-xl font-black text-green-600">{auto.active ? 'ON' : 'OFF'}</p>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Status</p>
                 </div>
                 <div className="flex items-center gap-3 pl-8 border-l border-gray-100">
                   <button 
                     onClick={() => toggleStatus(auto.id)}
                     className={`p-4 rounded-2xl transition-all shadow-sm ${
-                      auto.status === 'active' ? 'bg-amber-50 text-amber-600 hover:bg-amber-100' : 'bg-green-50 text-green-600 hover:bg-green-100'
+                      auto.active ? 'bg-amber-50 text-amber-600 hover:bg-amber-100' : 'bg-green-50 text-green-600 hover:bg-green-100'
                     }`}
                   >
-                    {auto.status === 'active' ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
+                    {auto.active ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
                   </button>
                   <button className="p-4 bg-gray-50 text-gray-400 rounded-2xl hover:bg-gray-100 transition-all">
                     <MoreVertical className="w-6 h-6" />

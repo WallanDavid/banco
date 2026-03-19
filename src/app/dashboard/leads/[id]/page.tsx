@@ -24,7 +24,7 @@ import {
   History,
   AlertCircle
 } from 'lucide-react';
-import { supabase, isMockMode } from '@/lib/supabase';
+import { supabase, ensureDemoState, isMockMode, updateDemoLead, type DemoLead } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Link from 'next/link';
@@ -42,23 +42,43 @@ interface Lead {
   source: string;
   benefit_type: string;
   created_at: string;
+  profile?: DemoLead['profile'];
+  fintech_interest?: DemoLead['fintechInterest'];
+  appointment_at?: string;
+  interactions?: DemoLead['interactions'];
 }
 
 interface Message {
   id: string;
-  lead_id: string;
-  sender: string;
+  sender: 'bot' | 'human' | 'lead';
   content: string;
   type: string;
-  status: string;
   created_at: string;
 }
 
-const MOCK_MESSAGES = [
+const MOCK_MESSAGES: Message[] = [
   { id: '1', sender: 'bot', content: 'Olá! Recebemos seu interesse em crédito consignado. Como posso ajudar?', type: 'whatsapp', created_at: new Date(Date.now() - 1000*60*60).toISOString() },
   { id: '2', sender: 'lead', content: 'Gostaria de saber as taxas para aposentados.', type: 'whatsapp', created_at: new Date(Date.now() - 1000*60*55).toISOString() },
   { id: '3', sender: 'bot', content: 'Nossas taxas para aposentados começam em 1.45% ao mês. Deseja fazer uma simulação?', type: 'whatsapp', created_at: new Date(Date.now() - 1000*60*50).toISOString() },
 ];
+
+function profileLabel(profile?: DemoLead['profile']) {
+  switch (profile) {
+    case 'clt':
+      return 'CLT';
+    case 'servidor_publico':
+      return 'Servidor Público';
+    case 'aposentado_pensionista':
+      return 'Aposentado / Pensionista';
+    default:
+      return '—';
+  }
+}
+
+function fintechLabel(fintech?: DemoLead['fintechInterest']) {
+  if (!fintech) return '—';
+  return fintech === 'V8' ? 'V8 Fintech' : 'Presença Bank';
+}
 
 export default function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = useReact(params);
@@ -70,11 +90,16 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [sending, setSending] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [proposalLink, setProposalLink] = useState('');
+  const [activeTab, setActiveTab] = useState<'chat' | 'historico'>('chat');
+  const [appointmentAt, setAppointmentAt] = useState<string>('');
 
   useEffect(() => {
     async function fetchData() {
       if (isMockMode) {
-        setLead({
+        const demo = ensureDemoState();
+        const demoLead = demo.leads.find((l) => l.id === resolvedParams.id);
+
+        const fallback = {
           id: resolvedParams.id,
           name: 'João Silva',
           email: 'joao.silva@email.com',
@@ -85,10 +110,39 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           score: 85,
           status_id: '1',
           source: 'Facebook Ads',
-          benefit_type: 'Aposentado',
-          created_at: new Date(Date.now() - 1000*60*60*24).toISOString()
-        });
-        setMessages(MOCK_MESSAGES as any);
+          benefit_type: 'Aposentado / Pensionista',
+          created_at: new Date(Date.now() - 1000*60*60*24).toISOString(),
+        };
+
+        if (!demoLead) {
+          setLead(fallback);
+          setMessages(MOCK_MESSAGES);
+          setLoading(false);
+          return;
+        }
+
+        const mapped: Lead = {
+          id: demoLead.id,
+          name: demoLead.name,
+          email: `${demoLead.name.toLowerCase().replace(/\s+/g, '.')}@email.com`,
+          phone: demoLead.phone,
+          salary: demoLead.salary,
+          age: demoLead.age,
+          loan_amount: demoLead.loanAmount,
+          score: demoLead.score,
+          status_id: demoLead.stage,
+          source: demoLead.source,
+          benefit_type: profileLabel(demoLead.profile),
+          created_at: demoLead.createdAt,
+          profile: demoLead.profile,
+          fintech_interest: demoLead.fintechInterest,
+          appointment_at: demoLead.appointmentAt,
+          interactions: demoLead.interactions,
+        };
+
+        setLead(mapped);
+        setMessages(MOCK_MESSAGES);
+        setAppointmentAt(demoLead.appointmentAt ? demoLead.appointmentAt.slice(0, 16) : '');
         setLoading(false);
         return;
       }
@@ -114,13 +168,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     e.preventDefault();
     if (!newMessage.trim() || !lead) return;
 
-    const sentMsg = {
+    const sentMsg: Message = {
       id: Date.now().toString(),
-      lead_id: lead.id,
       sender: 'human',
       content: newMessage,
       type: 'whatsapp',
-      status: 'sent',
       created_at: new Date().toISOString()
     };
 
@@ -129,13 +181,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     
     // AI Mock Response
     setTimeout(() => {
-      const botMsg = {
+      const botMsg: Message = {
         id: (Date.now() + 1).toString(),
-        lead_id: lead.id,
         sender: 'bot',
         content: `Entendido, Sr(a) ${lead.name.split(' ')[0]}. Vou verificar essa informação agora mesmo.`,
         type: 'whatsapp',
-        status: 'sent',
         created_at: new Date().toISOString()
       };
       setMessages(prev => [...prev, botMsg]);
@@ -150,13 +200,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       setProposalLink(link);
       setGenerating(false);
       
-      const botMsg = {
+      const botMsg: Message = {
         id: Date.now().toString(),
-        lead_id: lead.id,
         sender: 'bot',
         content: `📄 Proposta gerada! Valor: R$ ${lead.loan_amount.toLocaleString('pt-BR')}. Link para assinatura: ${link}`,
         type: 'whatsapp',
-        status: 'sent',
         created_at: new Date().toISOString()
       };
       setMessages(prev => [...prev, botMsg]);
@@ -177,7 +225,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       {/* Top Navigation */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/dashboard" className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-gray-900 transition-all shadow-sm">
+          <Link href="/dashboard/leads" className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-gray-900 transition-all shadow-sm">
             <ChevronLeft className="w-6 h-6" />
           </Link>
           <div>
@@ -185,6 +233,12 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               <h1 className="text-3xl font-black text-gray-900 tracking-tight">{lead.name}</h1>
               <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-black rounded-full border border-blue-100 uppercase tracking-widest">
                 {lead.source}
+              </span>
+              <span className="px-3 py-1 bg-gray-50 text-gray-700 text-[10px] font-black rounded-full border border-gray-100 uppercase tracking-widest">
+                {profileLabel(lead.profile)}
+              </span>
+              <span className="px-3 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-black rounded-full border border-indigo-100 uppercase tracking-widest">
+                {fintechLabel(lead.fintech_interest)}
               </span>
             </div>
             <p className="text-gray-400 text-xs font-bold mt-1 uppercase tracking-widest flex items-center gap-2">
@@ -259,6 +313,41 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             </div>
           </div>
 
+          {/* Scheduling Card */}
+          <div className="bg-white p-8 rounded-[40px] border border-gray-100 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 text-gray-900 mb-2">
+              <Calendar className="w-5 h-5 text-blue-600" />
+              <h3 className="font-black text-sm uppercase tracking-widest">Agendar Retorno</h3>
+            </div>
+            <div className="space-y-3">
+              <input
+                type="datetime-local"
+                value={appointmentAt}
+                onChange={(e) => setAppointmentAt(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-50 border border-transparent rounded-2xl text-sm font-bold focus:bg-white focus:border-blue-500 outline-none transition-all"
+              />
+              <button
+                onClick={() => {
+                  if (!appointmentAt || !lead) return;
+                  const iso = new Date(appointmentAt).toISOString();
+                  setLead((prev) => (prev ? { ...prev, appointment_at: iso } : prev));
+                  if (isMockMode) {
+                    updateDemoLead(lead.id, { appointmentAt: iso, stage: 'Agendamento' });
+                  }
+                }}
+                className="w-full py-3 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all"
+              >
+                Salvar Agendamento
+              </button>
+              {lead.appointment_at && (
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                  <Clock className="w-3 h-3" />
+                  Agendado: {format(new Date(lead.appointment_at), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                </p>
+              )}
+            </div>
+          </div>
+
           {/* Notes Card */}
           <div className="bg-white p-8 rounded-[40px] border border-gray-100 shadow-sm space-y-4">
             <div className="flex items-center gap-2 text-gray-900 mb-4">
@@ -295,6 +384,22 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 </div>
               </div>
               <div className="flex gap-2">
+                <div className="flex bg-white border border-gray-100 rounded-2xl p-1 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('chat')}
+                    className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'chat' ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-900'}`}
+                  >
+                    Chat
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('historico')}
+                    className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'historico' ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-900'}`}
+                  >
+                    Histórico
+                  </button>
+                </div>
                 <button 
                   onClick={handleGenerateProposal}
                   disabled={generating}
@@ -308,7 +413,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
             {/* Message History */}
             <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-white custom-scrollbar">
-              {messages.map((msg) => (
+              {activeTab === 'chat' && messages.map((msg) => (
                 <div 
                   key={msg.id} 
                   className={`flex ${msg.sender === 'human' || msg.sender === 'bot' ? 'justify-end' : 'justify-start'}`}
@@ -337,27 +442,69 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   </div>
                 </div>
               ))}
+
+              {activeTab === 'historico' && (
+                <div className="space-y-4">
+                  {(lead.interactions ?? []).map((evt) => {
+                    const Icon =
+                      evt.type === 'email'
+                        ? Mail
+                        : evt.type === 'whatsapp'
+                          ? MessageSquare
+                          : evt.type === 'call'
+                            ? Phone
+                            : evt.type === 'proposal'
+                              ? FileText
+                              : StickyNote;
+                    return (
+                      <div key={evt.id} className="p-6 bg-gray-50 rounded-[28px] border border-gray-100 flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-4">
+                          <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center text-blue-600 shadow-sm">
+                            <Icon className="w-5 h-5" />
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-sm font-black text-gray-900">{evt.title}</p>
+                            {evt.body && <p className="text-xs text-gray-500 font-medium">{evt.body}</p>}
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">
+                          {format(new Date(evt.createdAt), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                        </span>
+                      </div>
+                    );
+                  })}
+
+                  {(lead.interactions ?? []).length === 0 && (
+                    <div className="py-12 text-center border-2 border-dashed border-gray-100 rounded-[32px] flex flex-col items-center gap-3">
+                      <AlertCircle className="w-8 h-8 text-gray-200" />
+                      <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest px-4">Sem histórico disponível</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Input Area */}
-            <form onSubmit={handleSendMessage} className="p-6 border-t border-gray-50 bg-gray-50/30">
-              <div className="relative group">
-                <input 
-                  type="text" 
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Digite aqui para falar com o cliente..." 
-                  className="w-full pl-6 pr-16 py-5 bg-white border border-gray-100 rounded-[24px] text-sm font-medium focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none shadow-sm transition-all"
-                />
-                <button 
-                  type="submit"
-                  disabled={!newMessage.trim()}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 disabled:opacity-50 disabled:shadow-none"
-                >
-                  <Send className="w-5 h-5" />
-                </button>
-              </div>
-            </form>
+            {activeTab === 'chat' && (
+              <form onSubmit={handleSendMessage} className="p-6 border-t border-gray-50 bg-gray-50/30">
+                <div className="relative group">
+                  <input 
+                    type="text" 
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Digite aqui para falar com o cliente..." 
+                    className="w-full pl-6 pr-16 py-5 bg-white border border-gray-100 rounded-[24px] text-sm font-medium focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none shadow-sm transition-all"
+                  />
+                  <button 
+                    type="submit"
+                    disabled={!newMessage.trim()}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 disabled:opacity-50 disabled:shadow-none"
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
 
           {/* Action History / Next Step */}
@@ -374,21 +521,38 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             </div>
 
             <div className="space-y-6">
-              {[
-                { action: 'Lead Capturado', date: 'Ontem às 14:20', icon: User, color: 'blue' },
-                { action: 'E-mail de Boas-vindas enviado', date: 'Ontem às 14:21', icon: Mail, color: 'indigo' },
-                { action: 'Interação com Chatbot', date: 'Hoje às 09:15', icon: Bot, color: 'green' },
-              ].map((item, i) => (
-                <div key={i} className="flex items-start gap-4">
-                  <div className={`p-2.5 rounded-xl bg-${item.color}-50 text-${item.color}-600`}>
-                    <item.icon className="w-4 h-4" />
+              {(lead.interactions ?? []).slice(-6).reverse().map((evt) => {
+                const Icon =
+                  evt.type === 'email'
+                    ? Mail
+                    : evt.type === 'whatsapp'
+                      ? MessageSquare
+                      : evt.type === 'call'
+                        ? Phone
+                        : evt.type === 'proposal'
+                          ? FileText
+                          : StickyNote;
+                return (
+                  <div key={evt.id} className="flex items-start gap-4">
+                    <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600">
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-gray-900">{evt.title}</p>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                        {format(new Date(evt.createdAt), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-black text-gray-900">{item.action}</p>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{item.date}</p>
-                  </div>
+                );
+              })}
+
+              {(lead.interactions ?? []).length === 0 && (
+                <div className="py-10 text-center border-2 border-dashed border-gray-100 rounded-[32px] flex flex-col items-center gap-3">
+                  <AlertCircle className="w-8 h-8 text-gray-200" />
+                  <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest px-4">Sem ações registradas</p>
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </div>

@@ -2,66 +2,69 @@
 
 import React, { useEffect, useState } from 'react';
 import { 
-  MoreVertical, 
   Plus, 
   Search, 
-  Filter, 
   MessageCircle,
   Clock,
   MoreHorizontal,
-  ChevronRight,
   TrendingUp,
   AlertCircle
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { ensureDemoState, moveDemoLeadStage, type DemoLead, type LeadStage } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Link from 'next/link';
 
-interface Lead {
-  id: string;
-  name: string;
-  phone: string;
-  salary: number;
-  loan_amount: number;
-  score: number;
-  status_id: string;
-  created_at: string;
-}
-
-interface Pipeline {
-  id: string;
+type PipelineColumn = {
+  id: LeadStage;
   name: string;
   position: number;
   color: string;
+};
+
+const PIPELINE_COLUMNS: PipelineColumn[] = [
+  { id: 'Captacao', name: 'Captação', position: 1, color: '#3b82f6' },
+  { id: 'Qualificacao', name: 'Qualificação', position: 2, color: '#8b5cf6' },
+  { id: 'ContatoInicial', name: 'Contato Inicial', position: 3, color: '#f59e0b' },
+  { id: 'PropostaEnviada', name: 'Proposta Enviada', position: 4, color: '#7c3aed' },
+  { id: 'Agendamento', name: 'Agendamento', position: 5, color: '#06b6d4' },
+  { id: 'Contratado', name: 'Contratado', position: 6, color: '#22c55e' },
+  { id: 'Perdido', name: 'Perdido', position: 7, color: '#e11d48' },
+];
+
+function profileLabel(profile: DemoLead['profile']) {
+  switch (profile) {
+    case 'clt':
+      return 'CLT';
+    case 'servidor_publico':
+      return 'Servidor';
+    case 'aposentado_pensionista':
+      return 'Aposentado';
+    default:
+      return profile;
+  }
 }
 
-const MOCK_PIPELINES = [
-  { id: '1', name: 'Captação', position: 1, color: '#3b82f6' },
-  { id: '2', name: 'Qualificação', position: 2, color: '#8b5cf6' },
-  { id: '3', name: 'Atendimento', position: 3, color: '#10b981' },
-  { id: '4', name: 'Simulação', position: 4, color: '#f59e0b' },
-  { id: '5', name: 'Contratação', position: 5, color: '#ef4444' },
-];
-
-const MOCK_LEADS = [
-  { id: '1', name: 'João Silva', phone: '(11) 99999-1111', salary: 5200, loan_amount: 12000, score: 85, status_id: '1', created_at: new Date().toISOString() },
-  { id: '2', name: 'Maria Santos', phone: '(21) 98888-2222', salary: 7500, loan_amount: 25000, score: 92, status_id: '2', created_at: new Date().toISOString() },
-  { id: '3', name: 'Pedro Oliveira', phone: '(31) 97777-3333', salary: 3200, loan_amount: 5000, score: 65, status_id: '1', created_at: new Date().toISOString() },
-  { id: '4', name: 'Ana Costa', phone: '(41) 96666-4444', salary: 4800, loan_amount: 15000, score: 78, status_id: '3', created_at: new Date().toISOString() },
-  { id: '5', name: 'Carlos Souza', phone: '(51) 95555-5555', salary: 9000, loan_amount: 40000, score: 95, status_id: '4', created_at: new Date().toISOString() },
-  { id: '6', name: 'Julia Lima', phone: '(61) 94444-6666', salary: 6000, loan_amount: 10000, score: 82, status_id: '5', created_at: new Date().toISOString() },
-];
-
 export default function PipelinePage() {
-  const [pipelines] = useState<Pipeline[]>(MOCK_PIPELINES);
-  const [leads, setLeads] = useState<Lead[]>(MOCK_LEADS);
+  const [pipelines] = useState<PipelineColumn[]>(PIPELINE_COLUMNS);
+  const [leads, setLeads] = useState<DemoLead[]>([]);
   const [loading, setLoading] = useState(true);
+  const [draggingLeadId, setDraggingLeadId] = useState<string | null>(null);
 
   useEffect(() => {
+    setTimeout(() => {
+      const demo = ensureDemoState();
+      setLeads(demo.leads);
+    }, 0);
     const timer = setTimeout(() => setLoading(false), 800);
     return () => clearTimeout(timer);
   }, []);
+
+  const handleDrop = (stage: LeadStage, leadId: string) => {
+    moveDemoLeadStage(leadId, stage);
+    const demo = ensureDemoState();
+    setLeads(demo.leads);
+  };
 
   if (loading) return (
     <div className="min-h-[80vh] flex flex-col items-center justify-center gap-4">
@@ -98,11 +101,20 @@ export default function PipelinePage() {
       <div className="flex-1 overflow-x-auto pb-10 -mx-6 px-6 scrollbar-hide">
         <div className="flex gap-8 h-full min-w-max">
           {pipelines.map((pipeline) => {
-            const columnLeads = leads.filter(l => l.status_id === pipeline.id);
-            const totalValue = columnLeads.reduce((acc, curr) => acc + curr.loan_amount, 0);
+            const columnLeads = leads.filter(l => l.stage === pipeline.id);
+            const totalValue = columnLeads.reduce((acc, curr) => acc + curr.loanAmount, 0);
 
             return (
-              <div key={pipeline.id} className="w-80 flex flex-col bg-gray-50/50 rounded-[32px] border border-gray-100/50">
+              <div
+                key={pipeline.id}
+                className="w-80 flex flex-col bg-gray-50/50 rounded-[32px] border border-gray-100/50"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => {
+                  if (!draggingLeadId) return;
+                  handleDrop(pipeline.id, draggingLeadId);
+                  setDraggingLeadId(null);
+                }}
+              >
                 {/* Column Header */}
                 <div className="p-6 flex flex-col gap-4 border-b border-gray-100">
                   <div className="flex items-center justify-between">
@@ -129,6 +141,12 @@ export default function PipelinePage() {
                     <Link 
                       href={`/dashboard/leads/${lead.id}`}
                       key={lead.id} 
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('text/plain', lead.id);
+                        setDraggingLeadId(lead.id);
+                      }}
+                      onDragEnd={() => setDraggingLeadId(null)}
                       className="block bg-white p-5 rounded-3xl border border-gray-100 shadow-sm hover:shadow-xl hover:border-blue-100 hover:translate-y-[-2px] transition-all group"
                     >
                       <div className="flex items-start justify-between mb-4">
@@ -141,7 +159,7 @@ export default function PipelinePage() {
                               {lead.name}
                             </span>
                             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                              {format(new Date(lead.created_at), 'dd MMM')}
+                              {format(new Date(lead.createdAt), 'dd MMM', { locale: ptBR })}
                             </span>
                           </div>
                         </div>
@@ -156,12 +174,12 @@ export default function PipelinePage() {
                       <div className="space-y-3 mb-5">
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Solicitado</span>
-                          <span className="text-sm font-black text-blue-600">R$ {lead.loan_amount?.toLocaleString('pt-BR')}</span>
+                          <span className="text-sm font-black text-blue-600">R$ {lead.loanAmount?.toLocaleString('pt-BR')}</span>
                         </div>
                         <div className="h-1.5 bg-gray-50 rounded-full overflow-hidden">
                           <div 
                             className="h-full bg-blue-500 rounded-full transition-all duration-1000" 
-                            style={{ width: `${(pipeline.position / 5) * 100}%` }}
+                            style={{ width: `${(pipeline.position / pipelines.length) * 100}%` }}
                           />
                         </div>
                       </div>
@@ -184,6 +202,15 @@ export default function PipelinePage() {
                             <span className="text-[10px] font-black">2h</span>
                           </div>
                         </div>
+                      </div>
+
+                      <div className="mt-4 flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                          {profileLabel(lead.profile)}
+                        </span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">
+                          {lead.fintechInterest === 'V8' ? 'V8' : 'Presença'}
+                        </span>
                       </div>
                     </Link>
                   ))}

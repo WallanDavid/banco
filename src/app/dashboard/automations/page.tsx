@@ -22,32 +22,32 @@ import {
 const INITIAL_AUTOMATIONS = [
   {
     id: '1',
-    name: 'Boas-vindas WhatsApp',
-    trigger: 'lead_created',
+    name: 'Lead parado em Contato Inicial (D+2)',
+    trigger: 'stage_stuck',
     action: 'send_whatsapp',
     status: 'active',
-    description: 'Envia mensagem automática assim que o lead preenche o formulário.',
-    stats: { sent: 1245, conversion: '18%' }
+    description: 'Se o lead ficar 2 dias em Contato Inicial, envia lembrete automático (mock).',
+    stats: { sent: 312, conversion: '14%' }
   },
   {
     id: '2',
-    name: 'Nutrição E-mail D+1',
-    trigger: 'lead_created',
+    name: 'CLT simulou e não contratou (D+1)',
+    trigger: 'simulation_no_contract',
     delay: '24h',
-    action: 'send_email',
+    action: 'send_whatsapp',
     status: 'active',
-    description: 'Conteúdo educativo sobre as vantagens do consignado.',
-    stats: { sent: 850, conversion: '5.4%' }
+    description: 'Oferta especial para CLT após 24h sem contratação (mock).',
+    stats: { sent: 198, conversion: '9.2%' }
   },
   {
     id: '3',
-    name: 'Follow-up Proposta',
-    trigger: 'proposal_sent',
-    delay: '2h',
+    name: 'Servidor com agendamento (1h antes)',
+    trigger: 'appointment_reminder',
+    delay: '1h',
     action: 'send_whatsapp',
     status: 'paused',
-    description: 'Pergunta ao lead se ele conseguiu visualizar a proposta gerada.',
-    stats: { sent: 320, conversion: '12%' }
+    description: 'Lembrete de retorno para servidor 1h antes do horário agendado (mock).',
+    stats: { sent: 74, conversion: '—' }
   }
 ];
 

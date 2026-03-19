@@ -71,8 +71,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, proposal });
 
-  } catch (err: any) {
-    console.error('Error generating proposal:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Erro desconhecido';
+    console.error('Error generating proposal:', message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

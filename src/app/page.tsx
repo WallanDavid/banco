@@ -12,8 +12,9 @@ import {
   User, 
   Briefcase 
 } from 'lucide-react';
-import { supabase, isMockMode } from '@/lib/supabase';
-import { simulateCredit } from '@/lib/credit-logic';
+import Link from 'next/link';
+import { supabase, isMockMode, upsertDemoLeadFromLanding, type LeadProfile } from '@/lib/supabase';
+import { simulateCredit, type SimulationResult } from '@/lib/credit-logic';
 
 export default function LandingPage() {
   const [formData, setFormData] = useState({
@@ -23,12 +24,15 @@ export default function LandingPage() {
     salary: 5000,
     age: 45,
     loan_amount: 10000,
-    benefit_type: 'aposentado', // aposentado, pensionista, servidor
+    vinculo: 'aposentado_pensionista' as LeadProfile,
   });
   
-  const [simulation, setSimulation] = useState<any>(null);
+  const [simulation, setSimulation] = useState<SimulationResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [createdLeadId, setCreatedLeadId] = useState<string>('');
+  const [createdProfile, setCreatedProfile] = useState<LeadProfile>('aposentado_pensionista');
+  const [createdFintech, setCreatedFintech] = useState<'V8' | 'PRESENCA' | ''>('');
 
   // Update simulation when relevant fields change
   useEffect(() => {
@@ -46,6 +50,18 @@ export default function LandingPage() {
 
     if (isMockMode) {
       setTimeout(() => {
+        const created = upsertDemoLeadFromLanding({
+          name: formData.name,
+          phone: formData.phone,
+          salary: formData.salary,
+          age: formData.age,
+          loanAmount: formData.loan_amount,
+          profile: formData.vinculo,
+          source: 'Landing',
+        });
+        setCreatedLeadId(created.id);
+        setCreatedProfile(created.profile);
+        setCreatedFintech(created.fintechInterest);
         setSuccess(true);
         setLoading(false);
       }, 1500);
@@ -62,6 +78,7 @@ export default function LandingPage() {
       const { error } = await supabase.from('leads').insert([
         {
           ...formData,
+          benefit_type: formData.vinculo,
           status_id: pipelineData?.id,
           source: 'landing_page',
           score: 50, // Initial score
@@ -86,6 +103,11 @@ export default function LandingPage() {
   };
 
   if (success) {
+    const whatsappText = encodeURIComponent(
+      `Olá! Fiz uma simulação no Banco Automático. Meu vínculo é ${createdProfile === 'clt' ? 'CLT' : createdProfile === 'servidor_publico' ? 'Servidor Público' : 'Aposentado/Pensionista'}. Quero seguir com a proposta.`
+    );
+    const whatsappHref = `https://wa.me/55${formData.phone.replace(/\D/g, '')}?text=${whatsappText}`;
+
     return (
       <div className="min-h-screen bg-blue-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-[40px] p-12 max-w-xl w-full text-center shadow-2xl animate-in zoom-in-95 duration-500">
@@ -93,18 +115,56 @@ export default function LandingPage() {
             <CheckCircle className="w-12 h-12 text-green-500" />
           </div>
           <h2 className="text-4xl font-black text-gray-900 mb-4">Quase lá, {formData.name.split(' ')[0]}!</h2>
-          <p className="text-lg text-gray-600 mb-10 leading-relaxed">
-            Sua simulação de <span className="font-bold text-blue-600">R$ {formData.loan_amount.toLocaleString('pt-BR')}</span> foi processada com sucesso. Enviamos os detalhes agora mesmo para o seu WhatsApp!
-          </p>
+          {createdProfile === 'clt' ? (
+            <p className="text-lg text-gray-600 mb-10 leading-relaxed">
+              Sua simulação de <span className="font-bold text-blue-600">R$ {formData.loan_amount.toLocaleString('pt-BR')}</span> foi processada com sucesso.
+              <span className="block mt-2">
+                Você já pode seguir com a <span className="font-black text-gray-900">autocontratação</span>.
+              </span>
+            </p>
+          ) : createdProfile === 'servidor_publico' ? (
+            <p className="text-lg text-gray-600 mb-10 leading-relaxed">
+              <span className="font-black text-green-600">Pré-aprovado!</span> Um consultor te chamará no WhatsApp em até 24h.
+            </p>
+          ) : (
+            <p className="text-lg text-gray-600 mb-10 leading-relaxed">
+              Sua simulação de <span className="font-bold text-blue-600">R$ {formData.loan_amount.toLocaleString('pt-BR')}</span> foi processada com sucesso. Enviamos os detalhes agora mesmo para o seu WhatsApp!
+            </p>
+          )}
           <div className="bg-blue-50 p-6 rounded-3xl mb-10 flex items-center gap-4 text-left border border-blue-100">
             <div className="p-3 bg-blue-600 rounded-xl text-white">
               <Clock className="w-6 h-6" />
             </div>
             <div>
               <p className="text-sm font-bold text-blue-900 uppercase tracking-widest">Próximo Passo</p>
-              <p className="text-xs text-blue-700">Fique atento às notificações do seu celular.</p>
+              <p className="text-xs text-blue-700">
+                {createdProfile === 'clt'
+                  ? `Finalize sua contratação com o parceiro ${createdFintech === 'V8' ? 'V8 Fintech' : 'Presença Bank'}.`
+                  : 'Fique atento às notificações do seu celular.'}
+              </p>
             </div>
           </div>
+
+          {createdProfile === 'clt' && createdLeadId ? (
+            <Link
+              href={`/contract/${createdLeadId}`}
+              className="w-full inline-flex items-center justify-center gap-3 py-5 bg-gray-900 text-white rounded-2xl font-black text-lg hover:bg-black transition-all shadow-xl shadow-gray-200 group"
+            >
+              Contratar Agora
+              <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+            </Link>
+          ) : (
+            <a
+              href={whatsappHref}
+              target="_blank"
+              rel="noreferrer"
+              className="w-full inline-flex items-center justify-center gap-3 py-5 bg-gray-900 text-white rounded-2xl font-black text-lg hover:bg-black transition-all shadow-xl shadow-gray-200 group"
+            >
+              Falar no WhatsApp
+              <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+            </a>
+          )}
+
           <button
             onClick={() => setSuccess(false)}
             className="text-gray-400 font-bold hover:text-gray-600 transition-colors"
@@ -233,8 +293,8 @@ export default function LandingPage() {
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-bold text-blue-700">Parcela Estimada</span>
                       <span className="text-xl font-black text-blue-900">
-                        {simulation?.estimated_installment > 0 
-                          ? `R$ ${simulation.estimated_installment.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
+                        {(simulation?.estimated_installment ?? 0) > 0 
+                          ? `R$ ${(simulation?.estimated_installment ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
                           : 'R$ --'}
                       </span>
                     </div>
@@ -269,13 +329,13 @@ export default function LandingPage() {
                       <div className="relative">
                         <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <select
-                          name="benefit_type"
+                          name="vinculo"
                           onChange={handleChange}
                           className="w-full pl-12 pr-5 py-4 rounded-2xl bg-gray-50 border border-transparent focus:bg-white focus:border-blue-500 outline-none transition-all text-sm font-bold appearance-none cursor-pointer"
                         >
-                          <option value="aposentado">Aposentado</option>
-                          <option value="pensionista">Pensionista</option>
-                          <option value="servidor">Servidor</option>
+                          <option value="clt">CLT / Empregado Privado</option>
+                          <option value="servidor_publico">Servidor Público</option>
+                          <option value="aposentado_pensionista">Aposentado / Pensionista</option>
                         </select>
                       </div>
                       <div className="relative">

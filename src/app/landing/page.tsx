@@ -13,7 +13,7 @@ import {
   Briefcase 
 } from 'lucide-react';
 import { supabase, isMockMode } from '@/lib/supabase';
-import { simulateCredit } from '@/lib/credit-logic';
+import { simulateCredit, type SimulationResult } from '@/lib/credit-logic';
 
 export default function LandingPage() {
   const [formData, setFormData] = useState({
@@ -26,7 +26,7 @@ export default function LandingPage() {
     benefit_type: 'aposentado', // aposentado, pensionista, servidor
   });
   
-  const [simulation, setSimulation] = useState<any>(null);
+  const [simulation, setSimulation] = useState<SimulationResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
@@ -233,8 +233,8 @@ export default function LandingPage() {
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-bold text-blue-700">Parcela Estimada</span>
                       <span className="text-xl font-black text-blue-900">
-                        {simulation?.estimated_installment > 0 
-                          ? `R$ ${simulation.estimated_installment.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
+                        {(simulation?.estimated_installment ?? 0) > 0 
+                          ? `R$ ${(simulation?.estimated_installment ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
                           : 'R$ --'}
                       </span>
                     </div>

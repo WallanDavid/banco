@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { 
   BarChart, 
   Bar, 
@@ -12,17 +12,10 @@ import {
   PieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
   AreaChart,
   Area
 } from 'recharts';
 import { 
-  TrendingUp, 
-  Users, 
-  DollarSign, 
-  CheckCircle,
-  ArrowUpRight,
   ArrowDownRight,
   Filter,
   Download,
@@ -30,6 +23,7 @@ import {
   Target,
   MousePointer2
 } from 'lucide-react';
+import { ensureDemoState, type DemoState } from '@/lib/supabase';
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#64748b'];
 
@@ -60,14 +54,115 @@ const responseTimeData = [
 export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [demo, setDemo] = useState<DemoState | null>(null);
 
   useEffect(() => {
-    setMounted(true);
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 1000);
-    return () => clearTimeout(timer);
+    const raf = requestAnimationFrame(() => setMounted(true));
+    const timer = setTimeout(() => setLoading(false), 1000);
+    const storageTimer = setTimeout(() => {
+      try {
+        setDemo(ensureDemoState());
+      } catch {
+        setDemo(null);
+      }
+    }, 0);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+      clearTimeout(storageTimer);
+    };
   }, []);
+
+  const demoLeads = useMemo(() => demo?.leads ?? [], [demo]);
+  const demoSellers = useMemo(() => demo?.sellers ?? [], [demo]);
+
+  const profileData = useMemo(() => {
+    const counts = demoLeads.reduce(
+      (acc, l) => {
+        acc[l.profile] = (acc[l.profile] ?? 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+    return [
+      { name: 'CLT', value: counts.clt ?? 0 },
+      { name: 'Servidor', value: counts.servidor_publico ?? 0 },
+      { name: 'Aposentado', value: counts.aposentado_pensionista ?? 0 },
+    ];
+  }, [demoLeads]);
+
+  const conversionByProfile = useMemo(() => {
+    const base = {
+      clt: { total: 0, contracted: 0 },
+      servidor_publico: { total: 0, contracted: 0 },
+      aposentado_pensionista: { total: 0, contracted: 0 },
+    };
+    for (const l of demoLeads) {
+      base[l.profile].total += 1;
+      if (l.hasContracted) base[l.profile].contracted += 1;
+    }
+    return [
+      { name: 'CLT', conversion: base.clt.total ? Math.round((base.clt.contracted / base.clt.total) * 100) : 0 },
+      { name: 'Servidor', conversion: base.servidor_publico.total ? Math.round((base.servidor_publico.contracted / base.servidor_publico.total) * 100) : 0 },
+      { name: 'Aposentado', conversion: base.aposentado_pensionista.total ? Math.round((base.aposentado_pensionista.contracted / base.aposentado_pensionista.total) * 100) : 0 },
+    ];
+  }, [demoLeads]);
+
+  const appointments = useMemo(() => {
+    const now = new Date();
+    const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const endToday = startToday + 24 * 60 * 60 * 1000;
+    const endWeek = startToday + 7 * 24 * 60 * 60 * 1000;
+    let today = 0;
+    let week = 0;
+    for (const l of demoLeads) {
+      if (!l.appointmentAt) continue;
+      const t = new Date(l.appointmentAt).getTime();
+      if (t >= startToday && t < endToday) today += 1;
+      if (t >= startToday && t < endWeek) week += 1;
+    }
+    return { today, week };
+  }, [demoLeads]);
+
+  const sellerPerformance = useMemo(() => {
+    const bySeller = new Map<string, { name: string; contracted: number; total: number }>();
+    for (const s of demoSellers) bySeller.set(s.id, { name: s.name, contracted: 0, total: 0 });
+    for (const l of demoLeads) {
+      const entry = bySeller.get(l.sellerId) ?? { name: l.sellerId, contracted: 0, total: 0 };
+      entry.total += 1;
+      if (l.hasContracted) entry.contracted += 1;
+      bySeller.set(l.sellerId, entry);
+    }
+    return Array.from(bySeller.values()).sort((a, b) => b.contracted - a.contracted);
+  }, [demoLeads, demoSellers]);
+
+  const lossReasons = useMemo(() => {
+    const counts = demoLeads.reduce(
+      (acc, l) => {
+        if (!l.lostReason) return acc;
+        acc[l.lostReason] = (acc[l.lostReason] ?? 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+    const label = (key: string) => {
+      switch (key) {
+        case 'nao_respondeu':
+          return 'Não respondeu';
+        case 'nao_tinha_margem':
+          return 'Sem margem';
+        case 'nao_gostou_taxa':
+          return 'Não gostou da taxa';
+        case 'desistiu':
+          return 'Desistiu';
+        default:
+          return key;
+      }
+    };
+    return Object.keys(counts)
+      .map((k) => ({ key: k, label: label(k), value: counts[k] }))
+      .sort((a, b) => b.value - a.value);
+  }, [demoLeads]);
 
   if (!mounted || loading) return (
     <div className="min-h-[80vh] flex flex-col items-center justify-center gap-4">
@@ -223,6 +318,98 @@ export default function AnalyticsPage() {
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm">
+          <h3 className="text-xl font-black text-gray-900 mb-2">Leads por Perfil</h3>
+          <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-10">CLT vs Servidor vs Aposentado</p>
+          <div className="h-[320px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={profileData} innerRadius={70} outerRadius={110} paddingAngle={6} dataKey="value">
+                  {profileData.map((_, index) => (
+                    <Cell key={`p-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm">
+          <h3 className="text-xl font-black text-gray-900 mb-2">Conversão por Perfil</h3>
+          <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-10">% contratados por grupo</p>
+          <div className="h-[320px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={conversionByProfile}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fontWeight: 'bold', fill: '#94a3b8'}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fontWeight: 'bold', fill: '#94a3b8'}} domain={[0, 100]} />
+                <Tooltip contentStyle={{borderRadius: '24px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)'}} />
+                <Bar dataKey="conversion" fill="#3b82f6" radius={[12, 12, 0, 0]} barSize={48} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm space-y-10">
+          <div>
+            <h3 className="text-xl font-black text-gray-900 mb-2">Agendamentos</h3>
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Dia e semana</p>
+          </div>
+          <div className="grid grid-cols-2 gap-6">
+            <div className="p-6 bg-blue-50 rounded-[32px] border border-blue-100">
+              <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Hoje</p>
+              <p className="text-3xl font-black text-blue-900 mt-2">{appointments.today}</p>
+            </div>
+            <div className="p-6 bg-indigo-50 rounded-[32px] border border-indigo-100">
+              <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">7 dias</p>
+              <p className="text-3xl font-black text-indigo-900 mt-2">{appointments.week}</p>
+            </div>
+          </div>
+          <div>
+            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Motivos de Perda</h4>
+            <div className="space-y-3">
+              {lossReasons.slice(0, 5).map((r) => (
+                <div key={r.key} className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-600">{r.label}</span>
+                  <span className="text-xs font-black text-gray-900">{r.value}</span>
+                </div>
+              ))}
+              {lossReasons.length === 0 && (
+                <p className="text-xs text-gray-400 font-bold">Sem perdas registradas no demo.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm">
+        <div className="flex items-center justify-between mb-10">
+          <div>
+            <h3 className="text-xl font-black text-gray-900 mb-2">Performance dos Vendedores</h3>
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Contratos por agente (mock)</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {sellerPerformance.map((s, i) => (
+            <div key={`${s.name}-${i}`} className="p-6 bg-gray-50 rounded-[32px] border border-gray-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-black text-gray-900">{s.name}</p>
+                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{s.total} leads</span>
+              </div>
+              <div className="h-2 bg-white rounded-full overflow-hidden border border-gray-100">
+                <div className="h-full bg-green-500 rounded-full" style={{ width: `${s.total ? Math.round((s.contracted / s.total) * 100) : 0}%` }} />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Convertidos</span>
+                <span className="text-sm font-black text-green-600">{s.contracted}</span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

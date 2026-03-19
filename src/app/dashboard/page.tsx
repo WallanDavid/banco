@@ -33,7 +33,7 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { supabase, isMockMode } from '@/lib/supabase';
+import { ensureDemoState, isMockMode, resetDemoState, type DemoLead, type LeadProfile } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Link from 'next/link';
@@ -48,13 +48,52 @@ const chartData = [
   { name: 'Dom', leads: 15, conv: 4 },
 ];
 
-const MOCK_LEADS = [
-  { id: '1', name: 'João Silva', phone: '(11) 99999-1111', salary: 5200, score: 85, status: 'Novo Lead', source: 'Facebook Ads', created_at: new Date(Date.now() - 1000*60*30).toISOString() },
-  { id: '2', name: 'Maria Santos', phone: '(21) 98888-2222', salary: 7500, score: 92, status: 'Qualificado', source: 'Google Ads', created_at: new Date(Date.now() - 1000*60*120).toISOString() },
-  { id: '3', name: 'Pedro Oliveira', phone: '(31) 97777-3333', salary: 3200, score: 65, status: 'Contatado', source: 'Orgânico', created_at: new Date(Date.now() - 1000*60*240).toISOString() },
-  { id: '4', name: 'Ana Costa', phone: '(41) 96666-4444', salary: 4800, score: 78, status: 'Proposta Enviada', source: 'Indicação', created_at: new Date(Date.now() - 1000*60*400).toISOString() },
-  { id: '5', name: 'Carlos Souza', phone: '(51) 95555-5555', salary: 9000, score: 95, status: 'Fechado Ganho', source: 'Facebook Ads', created_at: new Date(Date.now() - 1000*60*600).toISOString() },
-];
+type LeadRow = {
+  id: string;
+  name: string;
+  phone: string;
+  salary: number;
+  score: number;
+  status: string;
+  source: string;
+  created_at: string;
+  profile: LeadProfile;
+};
+
+function stageLabel(stage: DemoLead['stage']) {
+  switch (stage) {
+    case 'Captacao':
+      return 'Captação';
+    case 'Qualificacao':
+      return 'Qualificação';
+    case 'ContatoInicial':
+      return 'Contato Inicial';
+    case 'PropostaEnviada':
+      return 'Proposta Enviada';
+    case 'Agendamento':
+      return 'Agendamento';
+    case 'Contratado':
+      return 'Contratado';
+    case 'Perdido':
+      return 'Perdido';
+    default:
+      return stage;
+  }
+}
+
+function mapDemoLeadToRow(lead: DemoLead): LeadRow {
+  return {
+    id: lead.id,
+    name: lead.name,
+    phone: lead.phone,
+    salary: lead.salary,
+    score: lead.score,
+    status: stageLabel(lead.stage),
+    source: lead.source,
+    created_at: lead.createdAt,
+    profile: lead.profile,
+  };
+}
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'];
 
@@ -67,14 +106,18 @@ export default function Dashboard() {
     activeProposals: 42
   });
   
-  const [leads, setLeads] = useState(MOCK_LEADS);
+  const [leads, setLeads] = useState<LeadRow[]>([]);
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setRole(localStorage.getItem('userRole'));
+    setTimeout(() => {
+      setRole(localStorage.getItem('userRole'));
+      const demo = ensureDemoState();
+      setLeads(demo.leads.map(mapDemoLeadToRow));
+    }, 0);
     const timer = setTimeout(() => setLoading(false), 1000);
     return () => clearTimeout(timer);
   }, []);
@@ -110,7 +153,8 @@ export default function Dashboard() {
             onClick={() => {
               setLoading(true);
               setTimeout(() => {
-                setLeads([...MOCK_LEADS].sort(() => Math.random() - 0.5));
+                const next = resetDemoState({ seed: Date.now() });
+                setLeads(next.leads.map(mapDemoLeadToRow));
                 setLoading(false);
               }, 1000);
             }}
@@ -209,7 +253,7 @@ export default function Dashboard() {
                   paddingAngle={8}
                   dataKey="value"
                 >
-                  {MOCK_LEADS.map((_, index) => (
+                  {leads.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
                   ))}
                 </Pie>
@@ -261,8 +305,8 @@ export default function Dashboard() {
                 Todos
               </button>
               <button 
-                onClick={() => setFilter('Novo Lead')}
-                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filter === 'Novo Lead' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'}`}
+                onClick={() => setFilter('Captação')}
+                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filter === 'Captação' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'}`}
               >
                 Novos
               </button>
@@ -302,8 +346,8 @@ export default function Dashboard() {
                   </td>
                   <td className="px-8 py-6">
                     <span className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${
-                      lead.status === 'Novo Lead' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                      lead.status === 'Fechado Ganho' ? 'bg-green-50 text-green-600 border-green-100' :
+                      lead.status === 'Captação' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                      lead.status === 'Contratado' ? 'bg-green-50 text-green-600 border-green-100' :
                       'bg-gray-50 text-gray-500 border-gray-100'
                     }`}>
                       {lead.status}

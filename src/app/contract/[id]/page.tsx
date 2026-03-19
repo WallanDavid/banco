@@ -13,28 +13,114 @@ import {
   QrCode,
   ArrowRight,
   Clock,
-  User,
   Check
 } from 'lucide-react';
-import { isMockMode } from '@/lib/supabase';
-import { simulateCredit } from '@/lib/credit-logic';
+import { ensureDemoState, isMockMode, type DemoLead } from '@/lib/supabase';
+import { simulateCredit, type SimulationResult } from '@/lib/credit-logic';
+
+type FintechProposal = {
+  proposalId?: string;
+  partner: 'V8' | 'PRESENCA';
+  profile?: string;
+  requestedAmount?: number;
+  releasedValue?: number;
+  fee?: number;
+  nominalRateMonthly?: number;
+  cetAnnual?: number;
+  installments?: number;
+  installmentValue?: number;
+  status?: string;
+};
+
+type ContractProposal = {
+  simulation_data: SimulationResult;
+  status: 'pending' | 'accepted' | 'rejected';
+  fintech?: FintechProposal;
+};
+
+type ContractLead = {
+  name: string;
+  loan_amount: number;
+  salary: number;
+  age: number;
+  benefit_type: string;
+  profile: DemoLead['profile'];
+};
 
 export default function ContractPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = useReact(params);
   const [step, setStep] = useState(1); // 1: Confirmação, 2: Assinatura, 3: Pagamento, 4: Finalizado
-  const [proposal, setProposal] = useState<any>(null);
-  const [lead, setLead] = useState<any>(null);
+  const [proposal, setProposal] = useState<ContractProposal | null>(null);
+  const [lead, setLead] = useState<ContractLead | null>(null);
   const [loading, setLoading] = useState(true);
+  const [partner, setPartner] = useState<'V8' | 'PRESENCA' | null>(null);
   const [pixCode] = useState('00020101021126580014BR.GOV.BCB.PIX0136b5c3e5a7-9d6f-4c8e-b5c3-e5a79d6f4c8e52040000530398654040.015802BR5913BANCO_AUTOMAT6008SAO_PAULO62070503***6304E2D5');
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    // Mock data for demo
-    setLead({ name: 'João Silva', loan_amount: 12000, salary: 5200, age: 45, benefit_type: 'Aposentado' });
-    const sim = simulateCredit({ salary: 5200, age: 45, loan_amount: 12000 });
-    setProposal({ simulation_data: sim, status: 'pending' });
-    setLoading(false);
-  }, []);
+    async function load() {
+      if (isMockMode) {
+        const demo = ensureDemoState();
+        const demoLead = demo.leads.find((l) => l.id === resolvedParams.id);
+        const effectiveLead: DemoLead | null = demoLead ?? null;
+
+        const mappedLead: ContractLead = effectiveLead
+          ? {
+              name: effectiveLead.name,
+              loan_amount: effectiveLead.loanAmount,
+              salary: effectiveLead.salary,
+              age: effectiveLead.age,
+              benefit_type:
+                effectiveLead.profile === 'clt'
+                  ? 'CLT / Empregado Privado'
+                  : effectiveLead.profile === 'servidor_publico'
+                    ? 'Servidor Público'
+                    : 'Aposentado / Pensionista',
+              profile: effectiveLead.profile,
+            }
+          : { name: 'João Silva', loan_amount: 12000, salary: 5200, age: 45, benefit_type: 'Aposentado / Pensionista', profile: 'aposentado_pensionista' };
+
+        setLead(mappedLead);
+        setPartner(effectiveLead?.fintechInterest ?? 'V8');
+
+        const sim = simulateCredit({ salary: mappedLead.salary, age: mappedLead.age, loan_amount: mappedLead.loan_amount });
+
+        try {
+          const qp = new URLSearchParams({
+            leadId: resolvedParams.id,
+            amount: String(mappedLead.loan_amount),
+            profile: mappedLead.profile,
+            partner: (effectiveLead?.fintechInterest ?? 'V8') === 'V8' ? 'V8' : 'PRESENCA',
+          });
+          const res = await fetch(`/.netlify/functions/fintech-proposal?${qp.toString()}`, { cache: 'no-store' });
+          if (!res.ok) throw new Error('fintech proposal failed');
+          const data = await res.json();
+          setPartner(data.partner === 'V8' ? 'V8' : 'PRESENCA');
+          setProposal({ simulation_data: sim, status: 'pending', fintech: data });
+        } catch {
+          setProposal({
+            simulation_data: sim,
+            status: 'pending',
+            fintech: {
+              partner: (effectiveLead?.fintechInterest ?? 'V8') === 'V8' ? 'V8' : 'PRESENCA',
+              status: 'pre_approved',
+            },
+          });
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
+
+      setLead({ name: 'João Silva', loan_amount: 12000, salary: 5200, age: 45, benefit_type: 'Aposentado / Pensionista', profile: 'aposentado_pensionista' });
+      const sim = simulateCredit({ salary: 5200, age: 45, loan_amount: 12000 });
+      setProposal({ simulation_data: sim, status: 'pending' });
+      setPartner('V8');
+      setLoading(false);
+    }
+
+    load();
+  }, [resolvedParams.id]);
 
   const copyPix = () => {
     navigator.clipboard.writeText(pixCode);
@@ -51,9 +137,36 @@ export default function ContractPage({ params }: { params: Promise<{ id: string 
     </div>
   );
 
+  if (!lead || !proposal) return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-gray-50">
+      <div className="w-12 h-12 border-4 border-red-600/20 border-t-red-600 rounded-full animate-spin"></div>
+      <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Proposta indisponível</p>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 font-sans selection:bg-blue-100">
       <div className="max-w-3xl mx-auto">
+        <div className="mb-10 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-100">
+              <TrendingUp className="text-white w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Integração Fintech</p>
+              <p className="text-sm font-black text-gray-900">
+                {partner === 'V8' ? 'Tecnologia V8 Fintech' : partner === 'PRESENCA' ? 'Parceiro Presença Bank' : 'Parceiro Fintech'}
+              </p>
+            </div>
+          </div>
+          {proposal?.fintech?.nominalRateMonthly && (
+            <div className="px-4 py-2 bg-white border border-gray-100 rounded-2xl shadow-sm text-right">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Taxa</p>
+              <p className="text-sm font-black text-blue-600">{String(proposal.fintech.nominalRateMonthly).replace('.', ',')}% a.m.</p>
+            </div>
+          )}
+        </div>
+
         {/* Progress Stepper */}
         <div className="mb-12">
           <div className="flex items-center justify-between relative">

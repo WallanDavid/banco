@@ -79,8 +79,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, contract, payment });
 
-  } catch (err: any) {
-    console.error('Error signing contract:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Erro desconhecido';
+    console.error('Error signing contract:', message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

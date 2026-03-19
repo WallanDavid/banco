@@ -2,57 +2,78 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Users, 
   Search, 
-  Filter, 
   Plus, 
-  MoreVertical, 
-  ChevronRight,
   Phone,
-  DollarSign,
-  TrendingUp,
-  Calendar,
-  CheckCircle,
-  Clock,
   ArrowRight
 } from 'lucide-react';
 import Link from 'next/link';
+import { ensureDemoState, type DemoLead } from '@/lib/supabase';
 
-const MOCK_LEADS = [
-  { id: '1', name: 'João Silva', phone: '(11) 99999-1111', salary: 5200, score: 85, status: 'Novo Lead', source: 'Facebook Ads', created_at: new Date(Date.now() - 1000*60*30).toISOString() },
-  { id: '2', name: 'Maria Santos', phone: '(21) 98888-2222', salary: 7500, score: 92, status: 'Qualificado', source: 'Google Ads', created_at: new Date(Date.now() - 1000*60*120).toISOString() },
-  { id: '3', name: 'Pedro Oliveira', phone: '(31) 97777-3333', salary: 3200, score: 65, status: 'Contatado', source: 'Orgânico', created_at: new Date(Date.now() - 1000*60*240).toISOString() },
-  { id: '4', name: 'Ana Costa', phone: '(41) 96666-4444', salary: 4800, score: 78, status: 'Proposta Enviada', source: 'Indicação', created_at: new Date(Date.now() - 1000*60*400).toISOString() },
-  { id: '5', name: 'Carlos Souza', phone: '(51) 95555-5555', salary: 9000, score: 95, status: 'Fechado Ganho', source: 'Facebook Ads', created_at: new Date(Date.now() - 1000*60*600).toISOString() },
-  { id: '6', name: 'Fernanda Lima', phone: '(11) 94444-6666', salary: 6100, score: 82, status: 'Novo Lead', source: 'Facebook Ads', created_at: new Date(Date.now() - 1000*60*800).toISOString() },
-  { id: '7', name: 'Roberto Mendes', phone: '(21) 93333-7777', salary: 4200, score: 71, status: 'Qualificado', source: 'Google Ads', created_at: new Date(Date.now() - 1000*60*1000).toISOString() },
-  { id: '8', name: 'Juliana Paiva', phone: '(31) 92222-8888', salary: 5500, score: 88, status: 'Contatado', source: 'Orgânico', created_at: new Date(Date.now() - 1000*60*1200).toISOString() },
-];
+function stageLabel(stage: DemoLead['stage']) {
+  switch (stage) {
+    case 'Captacao':
+      return 'Captação';
+    case 'Qualificacao':
+      return 'Qualificação';
+    case 'ContatoInicial':
+      return 'Contato Inicial';
+    case 'PropostaEnviada':
+      return 'Proposta Enviada';
+    case 'Agendamento':
+      return 'Agendamento';
+    case 'Contratado':
+      return 'Contratado';
+    case 'Perdido':
+      return 'Perdido';
+    default:
+      return stage;
+  }
+}
+
+function profileLabel(profile: DemoLead['profile']) {
+  switch (profile) {
+    case 'clt':
+      return 'CLT';
+    case 'servidor_publico':
+      return 'Servidor';
+    case 'aposentado_pensionista':
+      return 'Aposentado';
+    default:
+      return profile;
+  }
+}
 
 export default function LeadsPage() {
-  const [leads, setLeads] = useState(MOCK_LEADS);
+  const [leads, setLeads] = useState<DemoLead[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
 
   useEffect(() => {
+    setTimeout(() => {
+      const demo = ensureDemoState();
+      setLeads(demo.leads);
+    }, 0);
     const timer = setTimeout(() => setLoading(false), 800);
     return () => clearTimeout(timer);
   }, []);
 
   const filteredLeads = leads.filter(lead => {
-    const matchesFilter = filter === 'all' || lead.status === filter;
+    const matchesFilter = filter === 'all' || stageLabel(lead.stage) === filter;
     const matchesSearch = lead.name.toLowerCase().includes(search.toLowerCase()) || lead.phone.includes(search);
     return matchesFilter && matchesSearch;
   });
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Novo Lead': return 'bg-blue-50 text-blue-600 border-blue-100';
-      case 'Qualificado': return 'bg-indigo-50 text-indigo-600 border-indigo-100';
-      case 'Contatado': return 'bg-amber-50 text-amber-600 border-amber-100';
+      case 'Captação': return 'bg-blue-50 text-blue-600 border-blue-100';
+      case 'Qualificação': return 'bg-indigo-50 text-indigo-600 border-indigo-100';
+      case 'Contato Inicial': return 'bg-amber-50 text-amber-600 border-amber-100';
       case 'Proposta Enviada': return 'bg-purple-50 text-purple-600 border-purple-100';
-      case 'Fechado Ganho': return 'bg-green-50 text-green-600 border-green-100';
+      case 'Agendamento': return 'bg-cyan-50 text-cyan-700 border-cyan-100';
+      case 'Contratado': return 'bg-green-50 text-green-600 border-green-100';
+      case 'Perdido': return 'bg-rose-50 text-rose-600 border-rose-100';
       default: return 'bg-gray-50 text-gray-600 border-gray-100';
     }
   };
@@ -91,7 +112,7 @@ export default function LeadsPage() {
           />
         </div>
         <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
-          {['all', 'Novo Lead', 'Qualificado', 'Contatado', 'Proposta Enviada', 'Fechado Ganho'].map((f) => (
+          {['all', 'Captação', 'Qualificação', 'Contato Inicial', 'Proposta Enviada', 'Agendamento', 'Contratado', 'Perdido'].map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -130,10 +151,18 @@ export default function LeadsPage() {
                       </div>
                       <div>
                         <p className="text-sm font-black text-gray-900 group-hover:text-blue-600 transition-colors">{lead.name}</p>
-                        <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                          <Phone className="w-3 h-3" />
-                          {lead.phone}
-                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-xs text-gray-500 flex items-center gap-1">
+                            <Phone className="w-3 h-3" />
+                            {lead.phone}
+                          </p>
+                          <span className="px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider bg-gray-50 text-gray-600 border border-gray-100">
+                            {profileLabel(lead.profile)}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-100">
+                            {lead.fintechInterest === 'V8' ? 'V8' : 'Presença'}
+                          </span>
+                        </div>
                       </div>
                     </Link>
                   </td>
@@ -152,8 +181,8 @@ export default function LeadsPage() {
                     </div>
                   </td>
                   <td className="px-8 py-6">
-                    <span className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border ${getStatusColor(lead.status)}`}>
-                      {lead.status}
+                    <span className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border ${getStatusColor(stageLabel(lead.stage))}`}>
+                      {stageLabel(lead.stage)}
                     </span>
                   </td>
                   <td className="px-8 py-6">

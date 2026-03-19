@@ -8,8 +8,6 @@ import {
   ArrowRight, 
   ShieldCheck, 
   Zap,
-  LayoutDashboard,
-  Users,
   Eye,
   EyeOff
 } from 'lucide-react';
@@ -100,7 +98,7 @@ export default function LoginPage() {
               Acesso de Demonstração
             </p>
             <p className="text-xs text-amber-700 font-medium leading-relaxed">
-              Use qualquer e-mail para entrar. Se o e-mail contiver <span className="font-bold underline">"admin"</span>, você terá visão total do sistema.
+              Use qualquer e-mail para entrar. Se o e-mail contiver <span className="font-bold underline">&quot;admin&quot;</span>, você terá visão total do sistema.
             </p>
           </div>
 
